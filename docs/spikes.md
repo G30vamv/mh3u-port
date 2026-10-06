@@ -71,11 +71,42 @@ Reading it:
 
 The question is whether the graphics layer is reachable: take one known draw call from a Cemu capture and say what it needs.
 
-## 4. Does the generated code compile in a reasonable time? (not done, and needed before the first translator)
+## 4. Does the generated code compile in a reasonable time? (done: as C yes, as one Rust crate no)
 
-Translate a few thousand real functions to Rust and to C, compile each set, and time it; scale the result to 4.6 million instructions.
-If Rust cannot do it in minutes on an ordinary machine, the plan changes (C and a bundled compiler, or an interpreter/JIT for the cold
-code), and `docs/pc-port.md` says so.
+`mh3u-tools codegen-bench <dump> <out> --lang rust|c --functions N` translates an even sample of the game's functions (found as the
+targets of direct calls) into Rust or C in the shape a recompiler would give them, to be built and timed. **It is not a translator**:
+98% of the instructions get real code (integer arithmetic, rotates, compares, loads and stores, floating point, branches by block) and
+the rest a placeholder call; nothing checks that it behaves like the game. It refuses to write inside a git working tree, because
+its output is made from the game. The runs below are on one machine (24 threads, 31 GB, Linux, rustc 1.99, clang and gcc 16); the
+sample is 4,000 functions, **486,782 instructions, 10.6% of the game**, and the "whole game" figures are that times 9.47.
+
+| | sample (4,000 functions) | whole game, scaled |
+|---|---|---|
+| generated source, C | 18.9 MB, 644,000 lines | about 180 MB, 6.1 million lines |
+| generated source, Rust | 31.7 MB, 860,000 lines | about 300 MB, 8.1 million lines |
+| **C, clang `-O0`, one thread** | 11.4 s | about 108 s |
+| **C, clang `-O1`, one thread** | 31.8 s | **about 5 minutes** (about 40 s on 8 cores) |
+| C, clang `-O2`, one thread | 37.2 s | about 6 minutes |
+| C, gcc `-O1` (500 functions only) | 4.6 s against clang's 3.6 s | about the same, a little slower |
+| C, memory | 144 MB for one 100-function file | small, and per file |
+| **Rust, one crate, `opt-level` 0 or 1** | 78 s wall (24 threads), 126 s of CPU, **6.2 GB peak** | about 12 minutes and **about 59 GB**: not possible |
+| Rust, a crate of 500 functions | 17.6 s wall, 20 s CPU | 80 such crates: about 27 minutes of CPU |
+
+What it says:
+
+- **Generate C.** The same code as C builds about four times faster than as Rust and needs a tenth of the memory per unit, and the Rust
+  front end (type checking and borrow checking of millions of lines in one crate) is what costs, so turning optimisation off does not
+  help: `opt-level` 0 took as long as 1. Rust would have to be cut into dozens of crates with no calls between them (calls through a
+  table), which is possible but is more machinery for a slower build.
+- A C compiler is not a new requirement: on Linux `cc` is nearly always there, and the Rust toolchain on Windows needs the Visual Studio
+  build tools, which have `cl`. **Not tested:** MSVC's `cl` on this code (a Windows machine is needed), and clang-cl.
+- **Numbers to treat as lower limits.** The placeholders and the simple memory model (no address checks, no byte-order tricks beyond
+  a swap) are cheaper than what a real translator has to emit, and paired singles, exact rounding of single precision and
+  reservations will add code. Allow for twice the figures: about ten minutes for the first build on one core, and under two on eight.
+- **Not measured at all:** how fast the generated code *runs*. At `-O1` compile time is acceptable; whether the game reaches a frame
+  rate depends on the runtime and the graphics, not on this.
+- Build once on first start (or on a change of the game's files) and keep the result in the owner's cache folder: ten minutes once is
+  acceptable, ten minutes every start is not.
 
 ## The executable's layout (for reference)
 

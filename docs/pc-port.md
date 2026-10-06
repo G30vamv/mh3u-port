@@ -52,9 +52,11 @@ Not goals:
 - The workspace forbids `unsafe` (`unsafe_code = "forbid"`). A recompiled game needs raw memory access for the guest's address space,
   so the runtime would be the first place that needs `unsafe`. It would live in **one small crate** that is allowed to, kept apart
   and audited, and every other crate keeps the rule.
-- The recompiled game itself (see below) is generated code. It is **generated on the owner's machine** from their own files, so no
-  generated code is ever stored in or shipped from this repository. Generating Rust (so there is one toolchain to install) is the
-  plan; generating C is the fallback if Rust compile times for a game-sized program turn out to be unworkable.
+- The recompiled game itself (see below) is generated code, and **it is generated as C**, not Rust. It is made on the owner's machine
+  from their own files, so no generated code is ever stored in or shipped from this repository. We measured it (`docs/spikes.md`,
+  spike 4): the same code builds about four times faster as C and takes a tenth of the memory, where one Rust crate of the whole game
+  would need about 59 GB to compile. The owner needs a C compiler (`cc` on Linux; on Windows the Visual Studio build tools, which Rust
+  needs anyway). Everything else, including the program that runs the generated code, is Rust.
 
 ## Approach
 
@@ -88,7 +90,7 @@ New crates, beside the existing ones (nothing is renamed):
 |---|---|---|
 | `mh3u-core` | the game's files and the save, as now | exists |
 | `mh3u-dump` | finds and **verifies the owner's dump** (title ids, sizes, hashes) and says what is wrong; the only way any other crate learns where the game is | new |
-| `mh3u-ppc` | decodes Espresso instructions and translates them (the recompiler) | new |
+| `mh3u-ppc` | decodes Espresso instructions and translates them to C (the recompiler); the decoder exists | decoder done |
 | `mh3u-rt` | the runtime: guest memory, threads, the Cafe OS functions, the entry point. **The one crate that may use `unsafe`** | new |
 | `mh3u-gfx` | GX2 to `wgpu`: shaders, textures, render state | new |
 | `mh3u-platform` | window, input, audio, saves on disk | new |
@@ -113,7 +115,7 @@ Each step ends with something that can be checked, and the project stops being w
 3. **One frame (not done).** Take one known draw call from a Cemu capture and say what GX2 state and shader it needs. The result is whether
    the graphics layer is reachable at all.
 
-**Before the translator: spike 4 (`docs/spikes.md`), whether 4.6 million instructions of generated Rust compile in a sane time.** If not, the plan changes.
+**Before the translator: spike 4 (done: as C, about 5 minutes on one core for the whole game, as one Rust crate impossible; so the translator emits C; see `docs/spikes.md`).**
 
 **Then:**
 

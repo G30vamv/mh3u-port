@@ -1,6 +1,8 @@
 //! Explorers for the game's files, for the port's groundwork. They read the owner's own dump (`--game-dir`, or the `MH3U_GAME_DIR`
 //! environment variable) and print; they change nothing.
 
+mod codegen_bench;
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use mh3u_dump::{Dump, expand_home};
@@ -26,6 +28,22 @@ enum Tool {
         /// How many unknown words to show.
         #[arg(long, default_value_t = 20)]
         unknown: usize,
+    },
+    /// Spike 4: translate a sample of the game's functions into Rust or C, only to time how long that takes to compile. The output is
+    /// made from the game and is refused inside a git working tree.
+    CodegenBench {
+        game_dir: PathBuf,
+        /// Where to write the generated project (outside any repository).
+        out: PathBuf,
+        /// `rust` or `c`.
+        #[arg(long, default_value = "rust")]
+        lang: String,
+        /// How many functions to translate.
+        #[arg(long, default_value_t = 2000)]
+        functions: usize,
+        /// Functions per generated file.
+        #[arg(long, default_value_t = 100)]
+        per_file: usize,
     },
     /// List what the executable imports from the system libraries, by library (the size of the runtime a port would owe).
     Imports {
@@ -69,6 +87,28 @@ fn main() -> Result<()> {
             Ok(())
         }
         Tool::Sections { game_dir } => sections(&dump(&game_dir)?),
+        Tool::CodegenBench {
+            game_dir,
+            out,
+            lang,
+            functions,
+            per_file,
+        } => {
+            let data = read(&dump(&game_dir)?.executable()?)?;
+            let text = rpx::section_at(&data, TEXT_ADDRESS)?;
+            let words: Vec<u32> = text.as_chunks::<4>().0.iter().map(|w| u32::from_be_bytes(*w)).collect();
+            let lang = match lang.as_str() {
+                "rust" => codegen_bench::Lang::Rust,
+                "c" => codegen_bench::Lang::C,
+                other => anyhow::bail!("--lang is rust or c, not {other}"),
+            };
+            let r = codegen_bench::run(&words, TEXT_ADDRESS, functions, lang, &out, per_file)?;
+            println!(
+                "{} functions, {} instructions ({} placeholders), {} lines, {} bytes, {} files",
+                r.functions, r.instructions, r.placeholders, r.lines, r.bytes, r.files
+            );
+            Ok(())
+        }
         Tool::Coverage { game_dir, unknown } => coverage(&dump(&game_dir)?, unknown),
         Tool::Imports { game_dir, names } => imports(&dump(&game_dir)?, names),
         Tool::Arcls { arc } => {

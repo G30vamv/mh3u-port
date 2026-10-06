@@ -190,6 +190,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "mh3u-cemu",
  "mh3u-dump",
  "mh3u-formats",
  "mh3u-latte",

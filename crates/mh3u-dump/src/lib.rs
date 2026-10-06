@@ -81,6 +81,15 @@ impl Dump {
         Dump::locate(&expand_home(&std::env::var("MH3U_GAME_DIR").ok()?)).ok()
     }
 
+    /// The base game's own executable, which is what Cemu is started with (Cemu applies the update from its own folders).
+    pub fn base_executable(&self) -> Result<PathBuf> {
+        std::fs::read_dir(self.base.join("code"))
+            .with_context(|| format!("no code folder in {}", self.base.display()))?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .find(|p| p.extension().is_some_and(|x| x == "rpx"))
+            .with_context(|| format!("no .rpx in {}", self.base.join("code").display()))
+    }
+
     /// The game's executable: the update's when there is one (it replaces the base game's), else the base game's.
     pub fn executable(&self) -> Result<PathBuf> {
         let rpx_in = |folder: &Path| -> Option<PathBuf> {

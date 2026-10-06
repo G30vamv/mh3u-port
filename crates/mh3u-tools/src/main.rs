@@ -2,6 +2,8 @@
 //! environment variable) and print; they change nothing.
 
 mod codegen_bench;
+#[cfg(target_os = "linux")]
+mod shader_scan;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -28,6 +30,16 @@ enum Tool {
         /// How many unknown words to show.
         #[arg(long, default_value_t = 20)]
         unknown: usize,
+    },
+    /// Start Cemu on the game and, when a scene is up, look for shader programs in its memory (finds the vertex shaders, which are in no
+    /// file). Linux only. What it finds is made from the game and is refused inside a git working tree.
+    ScanShaders {
+        game_dir: PathBuf,
+        /// Where to write the programs found (outside any repository).
+        out: PathBuf,
+        /// The Cemu program.
+        #[arg(long, default_value = "Cemu")]
+        cemu: String,
     },
     /// Count what is in the game's shaders (the GPU's instruction census, spike 3).
     Shaders { game_dir: PathBuf },
@@ -124,6 +136,7 @@ fn main() -> Result<()> {
             );
             Ok(())
         }
+        Tool::ScanShaders { game_dir, out, cemu } => scan_shaders(&dump(&game_dir)?, &cemu, &out),
         Tool::Shaders { game_dir } => shaders(&dump(&game_dir)?),
         Tool::Coverage { game_dir, unknown } => coverage(&dump(&game_dir)?, unknown),
         Tool::Imports { game_dir, names } => imports(&dump(&game_dir)?, names),
@@ -183,6 +196,35 @@ fn sections(dump: &Dump) -> Result<()> {
         );
     }
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn scan_shaders(dump: &Dump, cemu: &str, out: &Path) -> Result<()> {
+    use mh3u_formats::gfd;
+    // the programs of the game's pack, to tell which of what is found in memory are known ones
+    let path = dump.content("nativeCafe/shaderArc.arc").context("no shaderArc.arc in the dump")?;
+    let data = read(&path)?;
+    let arc = Arc::parse(&data)?;
+    let entry = arc
+        .entries
+        .iter()
+        .find(|e| e.name == "shaderPack")
+        .context("no shaderPack in shaderArc.arc")?;
+    let pack = arc.read(entry)?;
+    let mut programs = Vec::new();
+    for file in gfd::parse_pack(&pack)? {
+        if let Some(p) = file.block(gfd::PIXEL_SHADER_PROGRAM)
+            && let Ok(c) = mh3u_latte::census(p)
+        {
+            programs.push(p[..c.extent].to_vec());
+        }
+    }
+    shader_scan::run(dump, cemu, out, &programs)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn scan_shaders(_: &Dump, _: &str, _: &Path) -> Result<()> {
+    anyhow::bail!("scan-shaders reads another process's memory and works on Linux only")
 }
 
 /// The game's shader pack and what is in it.

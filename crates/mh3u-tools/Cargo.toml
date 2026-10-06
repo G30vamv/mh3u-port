@@ -11,6 +11,7 @@ workspace = true
 anyhow.workspace = true
 clap.workspace = true
 mh3u-dump.workspace = true
+mh3u-cemu.workspace = true
 mh3u-formats.workspace = true
 mh3u-latte.workspace = true
 mh3u-ppc.workspace = true

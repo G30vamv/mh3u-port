@@ -121,8 +121,24 @@ a loose copy of the same pack (`content/nativeCafe/shaderPack.spkg`, the same 13
 pack; why they differ is not known). **Not one vertex shader is in any of them, in any archive, or in the executable's data as a GX2
 file** (searched: the `Gfx2` magic and the block headers in every archive, loose file and unpacked section; and a scan of `.rodata` and
 `.data` for programs that start with a call to a fetch shader found only false hits). The game must make or fetch them some other way.
-The way to find them is at run time: the game has them in memory once a scene is up, and `mh3u-latte`'s `census` can tell a real
-program from noise, so scanning Cemu's memory (`mh3u-cemu`) for programs that parse is the next step. It needs the game running.
+The way to find them is at run time: the game has them in memory once a scene is up. `mh3u-tools scan-shaders <dump> <out>` (Linux; build
+it with `--release`) starts Cemu on the game, waits for you to get a scene on screen, and on each Enter looks through all of the
+game's memory at every 256-byte boundary (GX2 aligns programs to that) for two things:
+
+- **the pixel shaders of the game's own pack, by exact match of their first 32 bytes.** This proves the scan works (the known shaders
+  must turn up) and says which of the 967 a scene uses;
+- **vertex-like programs, by structure:** one that starts by calling its fetch shader, parses cleanly to its end with `census`, exports
+  its results and does some arithmetic. Each is written to the output folder (which is refused inside a git working tree) and counted.
+
+Tested on made-up memory (no Cemu needed): the 967 pixel programs of the pack put into 64 MB of random bytes on 256-byte boundaries are
+all found where they were put, and nothing in the noise is taken for a vertex shader. How often noise in the game's real memory
+(textures and models are high-entropy) passes as a vertex shader is **not known** until it is run; what it finds is to be read with
+that in mind.
+
+To run it: `cargo build --release -p mh3u-tools`, then `target/release/mh3u-tools scan-shaders ~/games/wiiu ~/Work/shader-scan`.
+Cemu opens on the game; get to a village or into a quest; press Enter in the terminal to scan (it reads Cemu's whole memory, so it
+takes a minute or so); go somewhere else in the game (another map, a fight) and press Enter again to collect more; `q` and Enter stops
+and closes Cemu.
 
 **3c. One frame (later, and needs a capture).** What a draw call asks for at run time (the render targets, the textures' layouts, the
 blend state), to show the rest of the graphics layer is reachable. A capture from Cemu through RenderDoc shows Vulkan calls, not GX2, and

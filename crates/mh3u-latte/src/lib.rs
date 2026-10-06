@@ -62,10 +62,15 @@ pub fn alu_name(op3: bool, op: u32) -> Option<&'static str> {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Census {
     pub programs: usize,
+    /// How many bytes the program takes: its control flow and the furthest end of any clause it names (for one program; added up for
+    /// many it is meaningless).
+    pub extent: usize,
     /// Control-flow instructions by kind number.
     pub control_flow: BTreeMap<u32, usize>,
     pub alu_clauses: usize,
     pub tex_clauses: usize,
+    /// Exports of results (`export` and `export-done`): position and parameters of a vertex shader, colours of a pixel shader.
+    pub exports: usize,
     /// ALU instructions, and the groups (up to five issued together) they come in.
     pub alu_instructions: usize,
     pub groups: usize,
@@ -84,6 +89,8 @@ pub struct Census {
 impl Census {
     pub fn add(&mut self, other: &Census) {
         self.programs += other.programs;
+        self.extent += other.extent;
+        self.exports += other.exports;
         self.alu_clauses += other.alu_clauses;
         self.tex_clauses += other.tex_clauses;
         self.alu_instructions += other.alu_instructions;
@@ -134,7 +141,13 @@ pub fn census(program: &[u8]) -> Result<Census, String> {
             out.alu_clauses += 1;
             continue;
         }
+        if !(inst <= 0x1a || (0x27..=0x30).contains(&inst)) {
+            return Err(format!("control flow instruction {inst:#x} is none of the known ones"));
+        }
         *out.control_flow.entry(inst).or_default() += 1;
+        if matches!(inst, 0x27 | 0x28) {
+            out.exports += 1;
+        }
         if matches!(inst, 1..=3) {
             let count = (((w1 >> 10) & 7) | (((w1 >> 19) & 1) << 3)) as usize + 1;
             clauses.push((false, w0 as usize, count));
@@ -144,6 +157,7 @@ pub fn census(program: &[u8]) -> Result<Census, String> {
             break; // the end of the program
         }
     }
+    out.extent = i * 8;
     for (is_alu, address, count) in clauses {
         let mut at = address * 2; // in words
         if !is_alu {
@@ -153,6 +167,7 @@ pub fn census(program: &[u8]) -> Result<Census, String> {
             for k in 0..count {
                 *out.tex.entry(word(program, at + k * 4).unwrap_or(0) & 0x1f).or_default() += 1;
             }
+            out.extent = out.extent.max((at + count * 4) * 4);
             continue;
         }
         let mut used = 0;
@@ -198,6 +213,7 @@ pub fn census(program: &[u8]) -> Result<Census, String> {
         if used != count {
             return Err(format!("an ALU clause of {count} slots holds {used}"));
         }
+        out.extent = out.extent.max(at * 4);
         out.slots += count;
     }
     Ok(out)
@@ -238,6 +254,7 @@ mod tests {
         let c = census(&sample()).unwrap();
         assert_eq!((c.alu_clauses, c.alu_instructions, c.groups), (1, 2, 2));
         assert_eq!(c.slots, 3);
+        assert_eq!(c.extent, sample().len(), "the program is its control flow and its one clause");
         assert_eq!(c.literal_slots, 1, "a literal in channel y takes one slot of two constants");
         assert_eq!(c.op2.get(&25), Some(&1), "MOV");
         assert_eq!(c.op3.get(&16), Some(&1), "MULADD");
@@ -254,5 +271,7 @@ mod tests {
         assert!(census(&bad).is_err());
         // control flow that never ends
         assert!(census(&words(&[0, 0, 0, 0])).is_err());
+        // a control flow instruction that is none of the known ones
+        assert!(census(&words(&[0, 0x35 << 23, 0, 1 << 21])).is_err());
     }
 }

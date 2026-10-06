@@ -108,10 +108,12 @@ Each step ends with something that can be checked, and the project stops being w
 1. **Imports (done: 578 functions and 10 data in 22 libraries, about 390 that have to work; see `docs/spikes.md`).** List every function the executable imports from the system libraries, from its import tables (the RPX reader here
    already unpacks the sections). The result is the size of the runtime we would owe. If it is a few hundred functions, go on. If it is
    many more, or leans on parts nobody has a good account of, say so and stop.
-2. **Instruction coverage.** Decode the whole code section and count the instructions by kind and how many are unusual (paired
+2. **Instruction coverage (done: 99.9999% decoded, 134 instructions, 0.37% paired singles, 4,822 indirect jumps; a translator is weeks; see `docs/spikes.md`).** Decode the whole code section and count the instructions by kind and how many are unusual (paired
    singles, special registers, cache control). The result is whether a translator is a month or a year.
-3. **One frame.** Take one known draw call from a Cemu capture and say what GX2 state and shader it needs. The result is whether
+3. **One frame (not done).** Take one known draw call from a Cemu capture and say what GX2 state and shader it needs. The result is whether
    the graphics layer is reachable at all.
+
+**Before the translator: spike 4 (`docs/spikes.md`), whether 4.6 million instructions of generated Rust compile in a sane time.** If not, the plan changes.
 
 **Then:**
 

@@ -177,6 +177,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "mh3u-ppc"
+version = "0.1.0"
+
+[[package]]
 name = "mh3u-tools"
 version = "0.1.0"
 dependencies = [
@@ -184,6 +188,7 @@ dependencies = [
  "clap",
  "mh3u-dump",
  "mh3u-formats",
+ "mh3u-ppc",
 ]
 
 [[package]]

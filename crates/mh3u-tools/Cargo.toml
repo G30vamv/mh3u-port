@@ -12,3 +12,4 @@ anyhow.workspace = true
 clap.workspace = true
 mh3u-dump.workspace = true
 mh3u-formats.workspace = true
+mh3u-ppc.workspace = true

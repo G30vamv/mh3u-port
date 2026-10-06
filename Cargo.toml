@@ -19,3 +19,4 @@ memchr = "2"
 mh3u-formats = { path = "crates/mh3u-formats" }
 mh3u-dump = { path = "crates/mh3u-dump" }
 mh3u-cemu = { path = "crates/mh3u-cemu" }
+mh3u-ppc = { path = "crates/mh3u-ppc" }

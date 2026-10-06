@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo test --all
-# known vulnerabilities in the dependencies (https://rustsec.org). it runs when cargo-audit is installed (cargo install cargo-audit --locked)
+# known vulnerabilities in the dependencies (https://rustsec.org); this runs when cargo-audit is installed (cargo install cargo-audit --locked)
 if command -v cargo-audit >/dev/null 2>&1; then
     cargo audit
 else

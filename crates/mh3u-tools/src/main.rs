@@ -20,6 +20,13 @@ enum Tool {
     Dump { game_dir: PathBuf },
     /// List the sections of the game's executable.
     Sections { game_dir: PathBuf },
+    /// Count the instructions of the executable's code by kind, and the ones that are not known.
+    Coverage {
+        game_dir: PathBuf,
+        /// How many unknown words to show.
+        #[arg(long, default_value_t = 20)]
+        unknown: usize,
+    },
     /// List what the executable imports from the system libraries, by library (the size of the runtime a port would owe).
     Imports {
         game_dir: PathBuf,
@@ -62,6 +69,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Tool::Sections { game_dir } => sections(&dump(&game_dir)?),
+        Tool::Coverage { game_dir, unknown } => coverage(&dump(&game_dir)?, unknown),
         Tool::Imports { game_dir, names } => imports(&dump(&game_dir)?, names),
         Tool::Arcls { arc } => {
             for e in Arc::parse(&read(&arc)?)?.entries {
@@ -117,6 +125,132 @@ fn sections(dump: &Dump) -> Result<()> {
             s.flags,
             if s.compressed() { " zlib" } else { "" }
         );
+    }
+    Ok(())
+}
+
+/// Where the executable's code is loaded.
+const TEXT_ADDRESS: u32 = 0x0200_0020;
+
+fn coverage(dump: &Dump, show_unknown: usize) -> Result<()> {
+    use mh3u_ppc::{Class, decode, spr, spr_name};
+    use std::collections::BTreeMap;
+    let data = read(&dump.executable()?)?;
+    let text = rpx::section_at(&data, TEXT_ADDRESS)?;
+    let words: Vec<u32> = text.as_chunks::<4>().0.iter().map(|w| u32::from_be_bytes(*w)).collect();
+    let mut by_name: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut by_class: BTreeMap<Class, usize> = BTreeMap::new();
+    let mut sprs: BTreeMap<String, usize> = BTreeMap::new();
+    let mut unknown: Vec<(u32, u32)> = Vec::new();
+    let mut unknown_count = 0usize;
+    let mut unknown_opcodes: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut zero = 0usize;
+    // how the branches go: direct calls and jumps, returns, and the ones through a register
+    let (mut calls, mut jumps, mut conditional, mut returns, mut conditional_returns, mut indirect_jumps, mut indirect_calls) =
+        (0usize, 0usize, 0usize, 0usize, 0usize, 0usize, 0usize);
+    for (i, &word) in words.iter().enumerate() {
+        let address = TEXT_ADDRESS + (i as u32) * 4;
+        match decode(word) {
+            Some(d) => {
+                *by_name.entry(d.name).or_default() += 1;
+                *by_class.entry(d.class).or_default() += 1;
+                let link = word & 1 != 0;
+                let always = (word >> 21) & 0x14 == 0x14;
+                match (d.name, link) {
+                    ("b", true) => calls += 1,
+                    ("b", false) => jumps += 1,
+                    ("bc", _) => conditional += 1,
+                    ("bclr", false) if always => returns += 1,
+                    ("bclr", _) if !always => conditional_returns += 1,
+                    ("bclr", true) | ("bcctr", true) => indirect_calls += 1,
+                    ("bcctr", false) => indirect_jumps += 1,
+                    _ => {}
+                }
+                if d.name == "mfspr" || d.name == "mtspr" {
+                    let n = spr(word);
+                    let name = spr_name(n).map_or_else(|| format!("spr {n}"), str::to_string);
+                    *sprs.entry(format!("{} {name}", d.name)).or_default() += 1;
+                }
+            }
+            None if word == 0 => zero += 1,
+            None => {
+                unknown_count += 1;
+                *unknown_opcodes.entry(word >> 26).or_default() += 1;
+                if unknown.len() < show_unknown {
+                    unknown.push((address, word));
+                }
+            }
+        }
+    }
+    let total = words.len();
+    let known: usize = by_class.values().sum();
+    println!("code: {} bytes, {total} words from {TEXT_ADDRESS:#x}", text.len());
+    println!(
+        "  decoded {known} ({:.2}%), zero words {zero}, unknown {unknown_count}",
+        100.0 * known as f64 / total as f64
+    );
+    println!("  {} different instructions are used", by_name.len());
+    println!("\nby kind:");
+    let mut kinds: Vec<_> = by_class.iter().collect();
+    kinds.sort_by_key(|(_, n)| std::cmp::Reverse(**n));
+    for (class, n) in kinds {
+        println!("  {class:<10?} {n:>9} {:>6.2}%", 100.0 * *n as f64 / total as f64);
+    }
+    let count = |names: &[&str]| names.iter().map(|n| by_name.get(n).copied().unwrap_or(0)).sum::<usize>();
+    println!("\nthe ones that cost a translator something:");
+    println!(
+        "  paired singles (ps_*, psq_*): {}",
+        by_class.get(&Class::Paired).copied().unwrap_or(0)
+    );
+    println!("  branches to a register (bclr, bcctr): {}", count(&["bclr", "bcctr"]));
+    println!("  reserved loads and stores (lwarx, stwcx.): {}", count(&["lwarx", "stwcx."]));
+    println!(
+        "  load/store multiple and string (lmw, stmw, lswi, lswx, stswi, stswx): {}",
+        count(&["lmw", "stmw", "lswi", "lswx", "stswi", "stswx"])
+    );
+    println!(
+        "  cache control: {}   sync/isync/eieio: {}",
+        by_class.get(&Class::Cache).copied().unwrap_or(0),
+        by_class.get(&Class::Sync).copied().unwrap_or(0)
+    );
+    println!(
+        "  system (sc, traps, rfi): {}   64-bit only: {}",
+        by_class.get(&Class::System).copied().unwrap_or(0),
+        by_class.get(&Class::Only64).copied().unwrap_or(0)
+    );
+    println!(
+        "  floating point status register: {}",
+        count(&["mtfsb0", "mtfsb1", "mtfsf", "mtfsfi", "mffs", "mcrfs"])
+    );
+    println!("\nhow the branches go:");
+    println!("  calls (bl): {calls}   jumps (b): {jumps}   conditional (bc, including loops): {conditional}");
+    println!("  returns (blr): {returns}   conditional returns: {conditional_returns}");
+    println!(
+        "  indirect jumps (bctr: jump tables, tail calls): {indirect_jumps}   indirect calls (bctrl, blrl: function pointers, virtual calls): {indirect_calls}"
+    );
+    println!("\nspecial registers:");
+    for (k, n) in &sprs {
+        println!("  {k:<22} {n:>8}");
+    }
+    println!("\nmost used instructions:");
+    let mut top: Vec<_> = by_name.iter().collect();
+    top.sort_by_key(|(_, n)| std::cmp::Reverse(**n));
+    for (name, n) in top.iter().take(25) {
+        println!("  {name:<12} {n:>9}");
+    }
+    println!("\nleast used (down to 1):");
+    for (name, n) in top.iter().rev().take(25) {
+        println!("  {name:<12} {n:>9}");
+    }
+    if unknown_count > 0 {
+        println!("\nunknown words by opcode (first six bits):");
+        for (op, n) in &unknown_opcodes {
+            println!("  {op:>2}: {n}");
+        }
+        println!("first unknown words:");
+        for (address, word) in &unknown {
+            println!("  {address:#010x}  {word:08x}");
+        }
     }
     Ok(())
 }

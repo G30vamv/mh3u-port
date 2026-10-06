@@ -67,7 +67,7 @@ Reading it:
 - About 127,000 returns means on the order of a hundred thousand functions: the translated program is split into many files, which the
   owner's machine builds once, on first start.
 
-## 3. The graphics: what the game asks of the GPU (3a, 3b done; the vertex shaders are missing; a captured frame is not needed yet)
+## 3. The graphics: what the game asks of the GPU (3a, 3b, 3d done: 579 pixel and 76 vertex programs, all in the game's files; a captured frame is not needed yet)
 
 The Wii U's GPU (Latte, an AMD R7xx/Evergreen design) runs shaders as **microcode binaries** the game hands to GX2. A port has to turn
 each one into something a PC GPU runs (SPIR-V or WGSL through `wgpu`), which is the largest single piece of what an emulator does for
@@ -115,30 +115,30 @@ Reading it: **the GPU side of the instruction set is small and plain.** About 40
 translator from this to SPIR-V or WGSL for the pixel shaders is weeks of work, not months, and the shader count (967) makes it an
 ahead-of-time job. What remains is everything around the shaders (state, formats, the vertex side).
 
-**3d. The vertex shaders are not in the game's files (open).** The 967 pixel shaders are in three places: `shaderArc.arc`'s `shaderPack`,
+**3d. The vertex shaders (done).** The 967 pixel shader files are 579 *different* programs, in three places: `shaderArc.arc`'s `shaderPack`,
 a loose copy of the same pack (`content/nativeCafe/shaderPack.spkg`, the same 13.4 MB) and 970 loose files in `content/nativeCafe/es/`
 (967 of them GX2 shader files, one shader each, with smaller programs: 2.6 MB in all, the largest 6,480 bytes against 229,360 in the
-pack; why they differ is not known). **Not one vertex shader is in any of them, in any archive, or in the executable's data as a GX2
-file** (searched: the `Gfx2` magic and the block headers in every archive, loose file and unpacked section; and a scan of `.rodata` and
-`.data` for programs that start with a call to a fetch shader found only false hits). The game must make or fetch them some other way.
-The way to find them is at run time: the game has them in memory once a scene is up. `mh3u-tools scan-shaders <dump> <out>` (Linux; build
-it with `--release`) starts Cemu on the game, waits for you to get a scene on screen, and on each Enter looks through all of the
-game's memory at every 256-byte boundary (GX2 aligns programs to that) for two things:
+pack; why they differ is not known). No vertex shader is in any of them, in any archive, or in the executable's data as a GX2 file.
 
-- **the pixel shaders of the game's own pack, by exact match of their first 32 bytes.** This proves the scan works (the known shaders
-  must turn up) and says which of the 967 a scene uses;
-- **vertex-like programs, by structure:** one that starts by calling its fetch shader, parses cleanly to its end with `census`, exports
-  its results and does some arithmetic. Each is written to the output folder (which is refused inside a git working tree) and counted.
+`mh3u-tools scan-shaders <dump> <out>` (Linux; start Cemu on the game, press Enter in a scene) looks through all of the game's memory
+at every 256-byte boundary for the pack's own pixel programs (exact match of their first 32 bytes) and for vertex-like programs (one that
+starts by calling its fetch shader, parses cleanly with `census`, exports and does arithmetic). Run on a real Cemu with a scene up, three
+scans gave the same result each time (2 s each):
 
-Tested on made-up memory (no Cemu needed): the 967 pixel programs of the pack put into 64 MB of random bytes on 256-byte boundaries are
-all found where they were put, and nothing in the noise is taken for a vertex shader. How often noise in the game's real memory
-(textures and models are high-entropy) passes as a vertex shader is **not known** until it is run; what it finds is to be read with
-that in mind.
+- **All 579 different pixel programs of the pack are in memory**: Cemu loads the whole pack at start. That is the proof that the scan
+  finds what is there.
+- **76 vertex-like programs, no more** (and each scan the same 76): 11,262 ALU instructions in 3,449 groups, 836 exports (about 11 each:
+  a position and its parameters), 28 two-operand and 4 three-operand operations, 333 texture fetches, and control flow that has what the
+  pixel shaders did not: **loops** (8 programs: `LOOP_START_DX10`, `LOOP_END`, and `ALU_BREAK`; the skinning of a model by its bones is
+  the likely use, but that is a guess).
+- **Where they are in the files: `content/nativeCafe/LtUserShader/LtUserShaderPackage.lfx`** (896,508 bytes, 775 entries by its header,
+  magic `MFX`). Every one of the 76 is in it whole, at a 4-byte boundary, and a scan of the file alone for the same structure (no Cemu)
+  finds 77 hits, 76 different: the same set. So **the game's whole shader inventory is in its files: 579 different pixel programs and 76
+  vertex programs.** The container (`MFX`) is not read yet; the programs can be found in it by structure, as the scan does.
 
-To run it: `cargo build --release -p mh3u-tools`, then `target/release/mh3u-tools scan-shaders ~/games/wiiu ~/Work/shader-scan`.
-Cemu opens on the game; get to a village or into a quest; press Enter in the terminal to scan (it reads Cemu's whole memory, so it
-takes a minute or so); go somewhere else in the game (another map, a fight) and press Enter again to collect more; `q` and Enter stops
-and closes Cemu.
+Together the whole game uses **40 different two-operand ALU operations, 6 three-operand ones and 3 texture fetch kinds**, and control
+flow of ALU and texture clauses, if/else, loops with break, and exports. That is the instruction set a shader translator has to cover:
+small, plain and finite, and the programs can all be translated once, before the first frame.
 
 **3c. One frame (later, and needs a capture).** What a draw call asks for at run time (the render targets, the textures' layouts, the
 blend state), to show the rest of the graphics layer is reachable. A capture from Cemu through RenderDoc shows Vulkan calls, not GX2, and

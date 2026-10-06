@@ -112,7 +112,7 @@ Each step ends with something that can be checked, and the project stops being w
    many more, or leans on parts nobody has a good account of, say so and stop.
 2. **Instruction coverage (done: 99.9999% decoded, 134 instructions, 0.37% paired singles, 4,822 indirect jumps; a translator is weeks; see `docs/spikes.md`).** Decode the whole code section and count the instructions by kind and how many are unusual (paired
    singles, special registers, cache control). The result is whether a translator is a month or a year.
-3. **The graphics (mostly done: 967 pixel shaders, 2.8 MB of microcode, a small plain instruction set (38 operations, no loops); the vertex shaders are not in the game's files and are to be found in memory at run time; see `docs/spikes.md`).** Take one known draw call from a Cemu capture and say what GX2 state and shader it needs. The result is whether
+3. **The graphics (mostly done: 579 different pixel programs and 76 vertex programs, all in the game's files, using 40 + 6 ALU operations, 3 texture fetches and plain control flow with loops; see `docs/spikes.md`).** Take one known draw call from a Cemu capture and say what GX2 state and shader it needs. The result is whether
    the graphics layer is reachable at all.
 
 **Before the translator: spike 4 (done: as C, about 5 minutes on one core for the whole game, as one Rust crate impossible; so the translator emits C; see `docs/spikes.md`).**

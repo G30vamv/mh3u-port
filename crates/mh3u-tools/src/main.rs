@@ -41,6 +41,8 @@ enum Tool {
         #[arg(long, default_value = "Cemu")]
         cemu: String,
     },
+    /// Count what is in shader program files (the ones `scan-shaders` writes), added up.
+    ProgramCensus { files: Vec<PathBuf> },
     /// Count what is in the game's shaders (the GPU's instruction census, spike 3).
     Shaders { game_dir: PathBuf },
     /// Spike 4: translate a sample of the game's functions into Rust or C, only to time how long that takes to compile. The output is
@@ -137,6 +139,14 @@ fn main() -> Result<()> {
             Ok(())
         }
         Tool::ScanShaders { game_dir, out, cemu } => scan_shaders(&dump(&game_dir)?, &cemu, &out),
+        Tool::ProgramCensus { files } => {
+            let mut total = mh3u_latte::Census::default();
+            for f in &files {
+                total.add(&mh3u_latte::census(&read(f)?).map_err(|e| anyhow::anyhow!("{}: {e}", f.display()))?);
+            }
+            print_census(&total);
+            Ok(())
+        }
         Tool::Shaders { game_dir } => shaders(&dump(&game_dir)?),
         Tool::Coverage { game_dir, unknown } => coverage(&dump(&game_dir)?, unknown),
         Tool::Imports { game_dir, names } => imports(&dump(&game_dir)?, names),
@@ -230,7 +240,7 @@ fn scan_shaders(_: &Dump, _: &str, _: &Path) -> Result<()> {
 /// The game's shader pack and what is in it.
 fn shaders(dump: &Dump) -> Result<()> {
     use mh3u_formats::gfd;
-    use mh3u_latte::{Census, alu_name, cf_name};
+    use mh3u_latte::Census;
     let path = dump.content("nativeCafe/shaderArc.arc").context("no shaderArc.arc in the dump")?;
     let data = read(&path)?;
     let arc = Arc::parse(&data)?;
@@ -268,6 +278,12 @@ fn shaders(dump: &Dump) -> Result<()> {
         files.len()
     );
     println!("programs: {bytes} bytes in all, {largest} the largest");
+    print_census(&total);
+    Ok(())
+}
+
+fn print_census(total: &mh3u_latte::Census) {
+    use mh3u_latte::{alu_name, cf_name};
     println!("\ncontrol flow ({} instructions):", total.control_flow.values().sum::<usize>());
     for (k, n) in &total.control_flow {
         let name = if *k >= 0x40 {
@@ -308,7 +324,6 @@ fn shaders(dump: &Dump) -> Result<()> {
         total.tex.values().sum::<usize>(),
         total.tex
     );
-    Ok(())
 }
 
 /// Where the executable's code is loaded.

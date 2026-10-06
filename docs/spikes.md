@@ -67,9 +67,38 @@ Reading it:
 - About 127,000 returns means on the order of a hundred thousand functions: the translated program is split into many files, which the
   owner's machine builds once, on first start.
 
-## 3. One frame (not done)
+## 3. The graphics: what the game asks of the GPU (started; a captured frame is not needed yet)
 
-The question is whether the graphics layer is reachable: take one known draw call from a Cemu capture and say what it needs.
+The Wii U's GPU (Latte, an AMD R7xx/Evergreen design) runs shaders as **microcode binaries** the game hands to GX2. A port has to turn
+each one into something a PC GPU runs (SPIR-V or WGSL through `wgpu`), which is the largest single piece of what an emulator does for
+graphics. How many there are, and how big, is the question; it can be answered from the game's files alone.
+
+**3a. Census of the shaders in the game's files (done).** `shaderArc.arc` (1 MB, packed) holds one entry, `shaderPack`, 13.4 MB
+unpacked: a short header (`GKP`, version 4, **967** shaders) followed by 967 GX2 shader files (`Gfx2`, version 7.1, the format Nintendo's
+tools write). Each holds a header block and a program block (block types 6 and 7 in that format, which I take to be a pixel shader's
+header and program) and the end marker:
+
+- **967 programs, 2,833,536 bytes of microcode in all; 2,930 bytes on average and 229,360 for the largest.**
+- 967 headers of up to 10,752 bytes (10,396,256 bytes in all): the shader's description, with the names and places of its uniforms and
+  samplers.
+- **No vertex shaders are in this pack**, and no other archive of the game holds a `Gfx2` file (the other three matches of the search are
+  chance bytes in a sound and a model). Where the vertex shaders are is **not known**: they may be built into the executable's data, or
+  made from a different container. This is the first thing to find.
+- A search for the magic `Gfx2` is how the shaders were found (`mh3u-tools arcsearch`), and `mh3u-tools arcx` unpacks the pack; the
+  parser for the pack and its blocks is not written yet.
+
+Reading it: a few hundred to a thousand programs of a few kilobytes each is a **finite, ahead-of-time** job: all of them can be
+translated once, on the owner's machine at first start, with the C translation, and not while playing (no shader-compile stutter). It
+is still a **shader compiler for Latte microcode**, which is large work (Cemu's is one of the biggest parts of it). Cemu's source is
+under the Mozilla Public Licence, which does not mix with this repository's public-domain licence; it can be read to learn what the
+instructions mean but not copied from.
+
+**3b. The shader instruction count (next).** The same as spike 2 for the GPU: decode the 967 programs (control flow, ALU and texture
+fetch instructions) and count the kinds, to say how many instructions a Latte translator needs and how many are unusual.
+
+**3c. One frame (later, and needs a capture).** What a draw call asks for at run time (the render targets, the textures' layouts, the
+blend state), to show the rest of the graphics layer is reachable. A capture from Cemu through RenderDoc shows Vulkan calls, not GX2, and
+it contains the game's textures, so it stays on the owner's machine and out of the repository. It is needed after 3a and 3b, not before.
 
 ## 4. Does the generated code compile in a reasonable time? (done: as C yes, as one Rust crate no)
 

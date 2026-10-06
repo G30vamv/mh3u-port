@@ -29,6 +29,8 @@ enum Tool {
         #[arg(long, default_value_t = 20)]
         unknown: usize,
     },
+    /// Count what is in the game's shaders (the GPU's instruction census, spike 3).
+    Shaders { game_dir: PathBuf },
     /// Spike 4: translate a sample of the game's functions into Rust or C, only to time how long that takes to compile. The output is
     /// made from the game and is refused inside a git working tree.
     CodegenBench {
@@ -45,6 +47,8 @@ enum Tool {
         #[arg(long, default_value_t = 100)]
         per_file: usize,
     },
+    /// Write one section of the executable (unpacked) to a file, by name (`.text`, `.rodata`, `.data`).
+    Section { game_dir: PathBuf, name: String, out: PathBuf },
     /// List what the executable imports from the system libraries, by library (the size of the runtime a port would owe).
     Imports {
         game_dir: PathBuf,
@@ -87,6 +91,17 @@ fn main() -> Result<()> {
             Ok(())
         }
         Tool::Sections { game_dir } => sections(&dump(&game_dir)?),
+        Tool::Section { game_dir, name, out } => {
+            let data = read(&dump(&game_dir)?.executable()?)?;
+            let all = rpx::sections(&data)?;
+            let section = all
+                .iter()
+                .find(|s| s.name == name)
+                .with_context(|| format!("no section called {name}"))?;
+            std::fs::write(&out, rpx::contents(&data, section)?)?;
+            println!("wrote {name}");
+            Ok(())
+        }
         Tool::CodegenBench {
             game_dir,
             out,
@@ -109,6 +124,7 @@ fn main() -> Result<()> {
             );
             Ok(())
         }
+        Tool::Shaders { game_dir } => shaders(&dump(&game_dir)?),
         Tool::Coverage { game_dir, unknown } => coverage(&dump(&game_dir)?, unknown),
         Tool::Imports { game_dir, names } => imports(&dump(&game_dir)?, names),
         Tool::Arcls { arc } => {
@@ -166,6 +182,90 @@ fn sections(dump: &Dump) -> Result<()> {
             if s.compressed() { " zlib" } else { "" }
         );
     }
+    Ok(())
+}
+
+/// The game's shader pack and what is in it.
+fn shaders(dump: &Dump) -> Result<()> {
+    use mh3u_formats::gfd;
+    use mh3u_latte::{Census, alu_name, cf_name};
+    let path = dump.content("nativeCafe/shaderArc.arc").context("no shaderArc.arc in the dump")?;
+    let data = read(&path)?;
+    let arc = Arc::parse(&data)?;
+    let entry = arc
+        .entries
+        .iter()
+        .find(|e| e.name == "shaderPack")
+        .context("no shaderPack in shaderArc.arc")?;
+    let pack_bytes = arc.read(entry)?;
+    let files = gfd::parse_pack(&pack_bytes)?;
+    let mut total = Census::default();
+    let (mut pixel, mut vertex, mut other) = (0, 0, 0);
+    let (mut bytes, mut largest) = (0usize, 0usize);
+    for (n, file) in files.iter().enumerate() {
+        let program = match (file.block(gfd::PIXEL_SHADER_PROGRAM), file.block(gfd::VERTEX_SHADER_PROGRAM)) {
+            (Some(p), _) => {
+                pixel += 1;
+                p
+            }
+            (None, Some(p)) => {
+                vertex += 1;
+                p
+            }
+            _ => {
+                other += 1;
+                continue;
+            }
+        };
+        bytes += program.len();
+        largest = largest.max(program.len());
+        total.add(&mh3u_latte::census(program).map_err(|e| anyhow::anyhow!("shader {n}: {e}"))?);
+    }
+    println!(
+        "{} shader files in the pack: {pixel} pixel, {vertex} vertex, {other} with neither",
+        files.len()
+    );
+    println!("programs: {bytes} bytes in all, {largest} the largest");
+    println!("\ncontrol flow ({} instructions):", total.control_flow.values().sum::<usize>());
+    for (k, n) in &total.control_flow {
+        let name = if *k >= 0x40 {
+            format!("alu-clause (kind {:#x})", k & 0xf)
+        } else {
+            cf_name(*k).to_string()
+        };
+        println!("  {k:>#5x} {name:<24} {n:>8}");
+    }
+    println!(
+        "\nALU: {} instructions in {} groups ({} clauses, {} slots of which {} literal constants)",
+        total.alu_instructions, total.groups, total.alu_clauses, total.slots, total.literal_slots
+    );
+    println!("  groups by size: {:?}", total.group_sizes);
+    println!(
+        "  {} different two-operand operations, {} three-operand:",
+        total.op2.len(),
+        total.op3.len()
+    );
+    let mut ops: Vec<(String, usize)> = total
+        .op2
+        .iter()
+        .map(|(k, n)| (format!("op2 {k:>3} {}", alu_name(false, *k).unwrap_or("")), *n))
+        .chain(
+            total
+                .op3
+                .iter()
+                .map(|(k, n)| (format!("op3 {k:>3} {}", alu_name(true, *k).unwrap_or("")), *n)),
+        )
+        .collect();
+    ops.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+    for (name, n) in ops {
+        println!("    {name:<24} {n:>8}");
+    }
+    println!(
+        "\ntexture: {} clauses, {} fetches, by instruction number: {:?}",
+        total.tex_clauses,
+        total.tex.values().sum::<usize>(),
+        total.tex
+    );
     Ok(())
 }
 

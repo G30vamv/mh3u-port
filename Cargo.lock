@@ -177,6 +177,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "mh3u-latte"
+version = "0.1.0"
+
+[[package]]
 name = "mh3u-ppc"
 version = "0.1.0"
 
@@ -188,6 +192,7 @@ dependencies = [
  "clap",
  "mh3u-dump",
  "mh3u-formats",
+ "mh3u-latte",
  "mh3u-ppc",
 ]
 

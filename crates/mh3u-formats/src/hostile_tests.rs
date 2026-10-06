@@ -204,3 +204,33 @@ fn a_scrambled_executable_is_an_error_not_a_panic_when_its_sections_and_imports_
     });
     assert!(bad.is_empty(), "{} inputs panicked, the first: {:02x?}", bad.len(), bad.first());
 }
+
+#[test]
+fn a_scrambled_shader_pack_is_an_error_not_a_panic() {
+    let block = |kind: u32, body: &[u8]| {
+        let mut b = b"BLK{".to_vec();
+        for v in [0x20u32, 1, 0, kind, body.len() as u32, 0, 0] {
+            b.extend(v.to_be_bytes());
+        }
+        b.extend(body);
+        b
+    };
+    let mut pack = b"\0GKP".to_vec();
+    pack.extend(4u32.to_be_bytes());
+    pack.extend(2u32.to_be_bytes());
+    pack.resize(0x1c, 0);
+    for _ in 0..2 {
+        let mut f = b"Gfx2".to_vec();
+        f.extend(0x20u32.to_be_bytes());
+        f.resize(0x20, 0);
+        f.extend(block(7, &[1u8; 40]));
+        f.extend(block(1, b""));
+        f.extend([0u8; 8]);
+        pack.extend(f);
+    }
+    assert_eq!(crate::gfd::parse_pack(&pack).unwrap().len(), 2);
+    let bad = panics(&pack, 3000, false, |d| {
+        let _ = crate::gfd::parse_pack(d);
+    });
+    assert!(bad.is_empty(), "{} inputs panicked, the first: {:02x?}", bad.len(), bad.first());
+}

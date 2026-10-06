@@ -15,8 +15,9 @@ your own copy of the Wii U game (base game `0005000010118300` and its update `00
 | `mh3u-formats` | the game's executable (`.rpx`: sections, imports), archives (`.arc`) and text (`.gmd`), with bounded decompression and tests on damaged files |
 | `mh3u-dump` | finds the owner's dump and checks that it is this game |
 | `mh3u-ppc` | decodes the Wii U's PowerPC instructions (spike 2) |
+| `mh3u-latte` | reads the Wii U GPU's shader programs and counts what is in them (spike 3) |
 | `mh3u-cemu` | reads the memory of a running Cemu (Linux), to compare the port with the emulator |
-| `mh3u-tools` | explorers: `dump`, `sections`, `imports`, `coverage`, `codegen-bench` (spike 4), `arcls`, `arcx`, `gmd`, `arcsearch` |
+| `mh3u-tools` | explorers: `dump`, `sections`, `imports`, `coverage`, `shaders` (spike 3), `section`, `codegen-bench` (spike 4), `arcls`, `arcx`, `gmd`, `arcsearch` |
 
 ```
 cargo run -p mh3u-tools -- dump "/path/to/your/games folder"

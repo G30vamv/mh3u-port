@@ -67,7 +67,7 @@ Reading it:
 - About 127,000 returns means on the order of a hundred thousand functions: the translated program is split into many files, which the
   owner's machine builds once, on first start.
 
-## 3. The graphics: what the game asks of the GPU (started; a captured frame is not needed yet)
+## 3. The graphics: what the game asks of the GPU (3a, 3b done; the vertex shaders are missing; a captured frame is not needed yet)
 
 The Wii U's GPU (Latte, an AMD R7xx/Evergreen design) runs shaders as **microcode binaries** the game hands to GX2. A port has to turn
 each one into something a PC GPU runs (SPIR-V or WGSL through `wgpu`), which is the largest single piece of what an emulator does for
@@ -93,8 +93,36 @@ is still a **shader compiler for Latte microcode**, which is large work (Cemu's 
 under the Mozilla Public Licence, which does not mix with this repository's public-domain licence; it can be read to learn what the
 instructions mean but not copied from.
 
-**3b. The shader instruction count (next).** The same as spike 2 for the GPU: decode the 967 programs (control flow, ALU and texture
-fetch instructions) and count the kinds, to say how many instructions a Latte translator needs and how many are unusual.
+**3b. The shader instruction census (done).** `mh3u-tools shaders <dump>` reads the pack and walks every program with `mh3u-latte`
+(control flow, then each ALU and texture clause it names). The check that the format is read right is strict: **every one of the 967
+programs ends where it should, every clause names addresses inside its program, every ALU clause holds exactly the number of slots its
+control flow says (294,482 slots in 14,310 clauses), and every program has exactly one `EXPORT_DONE`.** (Words are little-endian; read as
+big-endian the same programs do not parse.)
+
+- **Control flow, 25,546 instructions:** ALU clauses 14,310 (plain 7,226; push before 3,862; pop after 3,219; a rare fourth kind 3),
+  texture clauses 3,030, `JUMP` 3,781, `ELSE` 2,978, `POP` 480, `EXPORT_DONE` 967. **No loops, no calls, no returns, no early kills in
+  control flow**: only structured if/else. That is the simplest shape a shader can have.
+- **ALU: 261,985 instructions in 82,799 groups** of one to five instructions issued together (1: 23,413; 2: 7,246; 3: 11,903; 4:
+  12,814; 5: 27,423), with 32,497 slots of literal constants.
+- **Only 33 different two-operand operations and 5 three-operand ones are used** in all of it, and 3 texture fetch kinds. By use:
+  `MUL` 62,083, `MULADD` 26,525, `ADD` 25,416, `DOT4` 23,756, `MAX` 19,990, `DOT4_IEEE` 17,416, `MIN` 17,004, `CNDE_INT` 10,497, `MOV`
+  10,322, then operations 48, 108, 112 and 105 (6,000 to 9,400 each), `MULADD_IEEE` 4,000, and 20 more in smaller numbers (the rest by
+  number in the tool's output; I only name the ones whose numbers I am sure of).
+- **Texture: 4,948 fetches in 3,030 clauses**: instruction 16 (a plain sample) 3,244, 24 (a sample with a depth comparison, for shadows)
+  1,346, and 0 (358, not a sample).
+
+Reading it: **the GPU side of the instruction set is small and plain.** About 40 operations, structured control flow, no loops. A
+translator from this to SPIR-V or WGSL for the pixel shaders is weeks of work, not months, and the shader count (967) makes it an
+ahead-of-time job. What remains is everything around the shaders (state, formats, the vertex side).
+
+**3d. The vertex shaders are not in the game's files (open).** The 967 pixel shaders are in three places: `shaderArc.arc`'s `shaderPack`,
+a loose copy of the same pack (`content/nativeCafe/shaderPack.spkg`, the same 13.4 MB) and 970 loose files in `content/nativeCafe/es/`
+(967 of them GX2 shader files, one shader each, with smaller programs: 2.6 MB in all, the largest 6,480 bytes against 229,360 in the
+pack; why they differ is not known). **Not one vertex shader is in any of them, in any archive, or in the executable's data as a GX2
+file** (searched: the `Gfx2` magic and the block headers in every archive, loose file and unpacked section; and a scan of `.rodata` and
+`.data` for programs that start with a call to a fetch shader found only false hits). The game must make or fetch them some other way.
+The way to find them is at run time: the game has them in memory once a scene is up, and `mh3u-latte`'s `census` can tell a real
+program from noise, so scanning Cemu's memory (`mh3u-cemu`) for programs that parse is the next step. It needs the game running.
 
 **3c. One frame (later, and needs a capture).** What a draw call asks for at run time (the render targets, the textures' layouts, the
 blend state), to show the rest of the graphics layer is reachable. A capture from Cemu through RenderDoc shows Vulkan calls, not GX2, and

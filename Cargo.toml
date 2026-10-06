@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Unlicense"
+
+[workspace.lints.rust]
+# nothing needs unsafe yet; the runtime crate, when there is one, is the only place that may (see docs/pc-port.md)
+unsafe_code = "forbid"
+
+[workspace.dependencies]
+anyhow = "1"
+flate2 = "1"
+clap = { version = "4", features = ["derive"] }
+memchr = "2"
+mh3u-formats = { path = "crates/mh3u-formats" }
+mh3u-dump = { path = "crates/mh3u-dump" }
+mh3u-cemu = { path = "crates/mh3u-cemu" }

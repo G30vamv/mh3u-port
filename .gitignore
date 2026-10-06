@@ -1,0 +1,15 @@
+# build output and scratch analysis (extracted game data lives under target/live and target/host)
+target/
+
+# personal save-file copies used by some tests; never publish
+snapshots/
+
+# anything extracted from the game or copied from reference projects
+*.rpx
+*.arc
+*.gmd
+rpx_data.bin
+
+# local editor/tool state
+.claude/
+*.log

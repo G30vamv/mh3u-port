@@ -24,7 +24,7 @@ cargo run -p mh3u-tools -- imports "/path/to/your/games folder"
 ```
 
 The first four crates started as copies of the readers in the [companion app](https://github.com/glinesbdev/mh3u-companion) (public
-domain, same author); from here on they change on their own. Run `scripts/check.sh` before every commit.
+domain, same author); from here on they change on their own. Run `scripts/check.sh` before every commit; there is no CI.
 
 ## Licence
 

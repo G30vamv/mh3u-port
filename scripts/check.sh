@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The checks to run before every commit, stopping at the first failure. There is no CI: the repository is private and Actions are off.
+# The checks to run before every commit, stopping at the first failure. There is no CI yet.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 # the tests that need the game's files find them through MH3U_GAME_DIR; without it they skip

@@ -83,7 +83,7 @@ borderless fullscreen on the window's monitor.
 that is not optional. So the six modules the wishlist needs are copied into `crates/mh3u-mods/src/companion/`, from commit `563aa22`:
 `arc`, `inflate`, `gmd`, `rpx`, `recipes` and `save`. Their header says where they come from and what changed (the tests and one
 function that needs the drop tables were left out). If the companion puts its `/proc` reader behind `cfg(unix)` or a feature, the
-copy can become a git dependency (the repository is private, so cargo would fetch it with `net.git-fetch-with-cli`).
+copy can become a git dependency.
 
 ## Run 27 (PR #11, merged in fab2efe): it works
 

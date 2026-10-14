@@ -16,3 +16,26 @@ rpx_data.bin
 
 # core dumps QEMU writes when a guest test program crashes (qemu_mh3u-ppc-*.core)
 *.core
+
+# game dumps and anything from them: never commit (the port's output folder belongs outside the repository anyway)
+*.rpl
+*.wud
+*.wux
+*.app
+*.h3
+*.tmd
+*.tik
+*.cert
+title.key*
+keys.txt
+game.h
+f_*.c
+game.dll
+libgame.so
+# saves and per-hunter mod state
+save/
+user[1-3]
+wishlist.json
+wishlist.json.migrated
+wishlists/
+mh3u_latest.log

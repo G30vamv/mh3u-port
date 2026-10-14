@@ -1,6 +1,6 @@
 # A PC port of Monster Hunter 3 Ultimate: a proposal
 
-Status: **written as a proposal before the port was built; the spikes are done (`docs/spikes.md`) and the port now exists.** The
+Status (this is the original proposal, kept for its reasoning; the [README](../README.md) has setup and status): **written as a proposal before the port was built; the spikes are done (`docs/spikes.md`) and the port now exists.** The
 translator, the runtime and the graphics run the game to its character screen and the village (steps 4 to 6 below, and input from step 7);
 `docs/translator.md` says how, and what is not done. The plan below is kept as it was argued, with the crate table brought up to date.
 This document says what the project would be, what it needs from you, how it would be

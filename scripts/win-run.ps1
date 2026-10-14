@@ -6,7 +6,7 @@
 [CmdletBinding()]
 param(
     # The folder with the [Game] and [Update] dumps.
-    [string]$Games = (Join-Path $env:USERPROFILE 'path\to\games'),
+    [string]$Games = $env:MH3U_GAMES,
     # Where win-build.ps1 put the translated C and game.dll.
     [string]$Out = (Join-Path $env:LOCALAPPDATA 'mh3u\c'),
     # Print the FPS and the graphics timings (MH3U_FPS and MH3U_GFX_TIMES).
@@ -42,6 +42,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 # full paths, from where the script was started (they need not exist yet)
+if (-not $Games) {
+    throw "no games folder: pass -Games <folder with the [Game] and [Update] dumps> or set MH3U_GAMES"
+}
 $Games = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Games)
 $Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
 $tools = Join-Path $repo 'target\release\mh3u-tools.exe'

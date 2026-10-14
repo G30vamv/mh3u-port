@@ -70,7 +70,7 @@ Full details and troubleshooting: [`docs/windows.md`](docs/windows.md).
    ```powershell
    git clone https://github.com/glinesbdev/mh3u-port.git
    Set-Location mh3u-port
-   powershell -ExecutionPolicy Bypass -File scripts\win-build.ps1 -Games 'C:\path\to\your\games'
+   powershell -ExecutionPolicy Bypass -File scripts\win-build.ps1 -Games 'D:\path\to\your\games'
    ```
 
    The output goes to `%LOCALAPPDATA%\mh3u\c` (`-Out` changes it).
@@ -81,6 +81,8 @@ Full details and troubleshooting: [`docs/windows.md`](docs/windows.md).
    ```
 
    Useful switches: `-Fullscreen`, `-Scale 2`, `-Fps`, `-PadLayout nintendo`, `-NativeMenu`, `-NativeText`.
+   Instead of `-Games` each time, you can set the folder once: `$env:MH3U_GAMES = 'D:\path\to\your\games'` (or
+   `[Environment]::SetEnvironmentVariable('MH3U_GAMES', '...', 'User')`). The scripts stop with a message when neither is set.
 4. After pulling changes to the translator or the hooks, rebuild with `win-build.ps1 -Translate`.
 
 ## Setup on Linux (Arch)
@@ -98,7 +100,7 @@ Full details and troubleshooting: [`docs/windows.md`](docs/windows.md).
    ```sh
    git clone https://github.com/glinesbdev/mh3u-port.git && cd mh3u-port
    cargo build --release -p mh3u-tools
-   games="$HOME/Games/wiiu"           # the folder with the [Game] and [Update] folders
+   games=/path/to/your/games          # the folder with the [Game] and [Update] folders
    out="$HOME/.local/share/mh3u/c"    # outside the repository
    target/release/mh3u-tools dump "$games"          # checks it finds the right game
    target/release/mh3u-tools translate "$games" "$out"
@@ -107,7 +109,7 @@ Full details and troubleshooting: [`docs/windows.md`](docs/windows.md).
 3. Play. What the game prints also goes to `mh3u_latest.log`:
 
    ```sh
-   scripts/run.sh --games "$games" --out "$out"
+   scripts/run.sh --games "$games" --out "$out"     # or: export MH3U_GAMES="$games" MH3U_OUT="$out"
    ```
 
    Useful options: `--fullscreen`, `--scale 2`, `--fps`, `--pad-layout nintendo`, `--native-menu`, `--native-text`

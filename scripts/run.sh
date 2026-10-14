@@ -9,7 +9,7 @@ set -euo pipefail
 usage() {
     cat <<'USAGE'
 usage: scripts/run.sh [options]
-  --games DIR        the folder with the [Game] and [Update] dumps ($MH3U_GAMES, else ~/path/to/games)
+  --games DIR        the folder with the [Game] and [Update] dumps (or $MH3U_GAMES; required)
   --out DIR          the translated C and libgame.so ($MH3U_OUT, else ~/.local/share/mh3u/c)
   --fullscreen       borderless fullscreen on the window's monitor (F11 or Alt+Enter toggles it while playing)
   --fps              print the FPS and the graphics timings (MH3U_FPS, MH3U_GFX_TIMES)
@@ -28,7 +28,7 @@ USAGE
 }
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-games="${MH3U_GAMES:-$HOME/path/to/games}"
+games="${MH3U_GAMES:-}"
 out="${MH3U_OUT:-$HOME/.local/share/mh3u/c}"
 fullscreen=0 fps=0 report=0 dump="" frames="2400" debug_ps="" pad_layout="" scale="" native_text=0 menu_probe=0 native_menu=0 native_menu_key="" log=""
 while [ $# -gt 0 ]; do
@@ -57,6 +57,10 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+if [ -z "$games" ]; then
+    echo "no games folder: pass --games DIR (the folder with the [Game] and [Update] dumps) or set MH3U_GAMES" >&2
+    exit 2
+fi
 tools="$repo/target/release/mh3u-tools"
 for p in "$tools" "$out/libgame.so" "$games"; do
     if [ ! -e "$p" ]; then

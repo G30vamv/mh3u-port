@@ -177,8 +177,13 @@ clippy with warnings as errors, and the tests.
 - *Wii U* and *Nintendo* are trademarks of Nintendo.
 - This project is not affiliated with, endorsed or sponsored by Capcom or Nintendo.
 - It contains none of their code or assets. Everything that makes the game comes from your own dump at build time.
-- The licence in [`LICENSE`](LICENSE) covers only the original code in this repository, not the game or anything made from it.
-  The translated C that `translate` writes is derived from the game: keep it to yourself and never commit or share it.
+- The translated C that `translate` writes is derived from the game: keep it to yourself and never commit or share it.
+
+## License
+
+The original port code and tools in this repository are licensed under the **GNU Affero General Public License v3.0 only**
+(`AGPL-3.0-only`); see [`LICENSE`](LICENSE). The license covers only that original code. It does not cover the game's code or
+assets, anything translated or extracted from your dump, or the trademarks of Capcom and Nintendo, which remain their owners'.
 
 ## Acknowledgements
 

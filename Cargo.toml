@@ -5,7 +5,7 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "Unlicense"
+license = "AGPL-3.0-only"
 
 [workspace.lints.rust]
 # the runtime crate (mh3u-rt) is the only place that may use unsafe; it allows it in its own Cargo.toml (see docs/code-guidelines.md)

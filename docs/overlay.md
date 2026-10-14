@@ -78,7 +78,7 @@ borderless fullscreen on the window's monitor.
 
 ## The companion's code
 
-[glinesbdev/mh3u-companion](https://github.com/glinesbdev/mh3u-companion) is public domain, like this project. Its crate
+[glinesbdev/mh3u-companion](https://github.com/glinesbdev/mh3u-companion) is public domain, so its code can be used here (this project is AGPL-3.0). Its crate
 `mh3u-core` would be the natural dependency, but it does not build for Windows: its `/proc` memory reader uses `std::os::unix`, and
 that is not optional. So the six modules the wishlist needs are copied into `crates/mh3u-mods/src/companion/`, from commit `563aa22`:
 `arc`, `inflate`, `gmd`, `rpx`, `recipes` and `save`. Their header says where they come from and what changed (the tests and one

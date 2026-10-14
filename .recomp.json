@@ -1,0 +1,15 @@
+{
+  "$schema": "https://recomp.fyi/schema/v1.json",
+  "game": "Monster Hunter 3 Ultimate",
+  "wikidata": "Q3861000",
+  "system": "Wii U",
+  "type": "recomp",
+  "original": { "region": "USA", "revision": "v32" },
+  "project": "mh3u-port",
+  "status": "playable",
+  "targets": ["Windows", "Linux"],
+  "approach": "Static recompilation of the Wii U executable to native C, with a Rust runtime (wgpu graphics, cpal audio)",
+  "maintainers": [{ "name": "glinesbdev", "link": "https://github.com/glinesbdev" }],
+  "notes": "Playable native PC recomp. Opt-in wishlist overlay and in-game Mods menu. Some graphics glitches remain. No online play.",
+  "help": ["Graphics glitches", "Dump integrity check", "CI"]
+}

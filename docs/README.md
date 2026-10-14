@@ -26,6 +26,7 @@ Start with the [README](../README.md) for what the port is and how to set it up.
 
 | Document | What it covers |
 |---|---|
+| [../CONTRIBUTING.md](../CONTRIBUTING.md) | How to build, check and send changes, and what never to commit |
 | [code-guidelines.md](code-guidelines.md) | Code style and the checks to run before every commit |
 | [ghidra.md](ghidra.md) | Reading the game's code with Ghidra and the scripts in `scripts/ghidra/` |
 | [roadmap.md](roadmap.md) | What comes next |

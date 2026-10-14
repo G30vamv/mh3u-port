@@ -1,0 +1,73 @@
+name: Bug report
+description: Something in the port does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please **never attach or link game files**: no dumps, executables, extracted assets, keys,
+        save files or translated C. Logs and screenshots are fine.
+  - type: checkboxes
+    id: ownership
+    attributes:
+      label: Game files
+      options:
+        - label: I own the game, dumped it myself, and will not post any game files.
+          required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 23H2 / Arch Linux (kernel 6.x)
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver
+      placeholder: NVIDIA RTX 3070, driver 560.xx (Vulkan)
+    validations:
+      required: true
+  - type: dropdown
+    id: version
+    attributes:
+      label: Game region and update
+      description: Only USA 0005000010118300 with update v32 is supported.
+      options:
+        - USA 0005000010118300 + update v32
+        - Other (please say which below)
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Build commit
+      description: The output of `git rev-parse --short HEAD`, or the `[gfx] build …` line at the top of the log.
+    validations:
+      required: true
+  - type: input
+    id: flags
+    attributes:
+      label: Script switches and environment variables
+      placeholder: win-run.ps1 -Fullscreen -Scale 2; MH3U_NATIVE_MENU=1
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Load a hunter
+        2. Open the start menu
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Attach the session log (`mh3u_latest.log`, or a `session.log` you redirected to). Drag the file here.

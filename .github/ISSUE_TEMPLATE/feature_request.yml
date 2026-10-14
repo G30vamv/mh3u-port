@@ -1,0 +1,21 @@
+name: Feature request
+description: An idea for the port or its mods
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Please don't attach game files (dumps, assets, saves, translated C).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds you've tried

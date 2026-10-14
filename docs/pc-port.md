@@ -144,7 +144,7 @@ Not before step 5 works: any promise of dates.
   use hashes and addresses, not the game's contents.
 - The ownership check is part of the program and is not to be weakened, made optional or hidden behind a flag.
 - Third-party data used for what the game's files do not hold is credited, as in the companion app.
-- Licence: the port's own code is under the GNU AGPL-3.0 (see `LICENSE`; it was public domain until the repository went public). That covers *our* code only;
+- Licence: the port's own code is under the GNU AGPL-3.0 (see `LICENSE`; earlier versions were public domain). That covers *our* code only;
   it does not say anything about the game, which stays Capcom's.
 
 ## Risks and open questions

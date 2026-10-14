@@ -24,7 +24,7 @@ Work in progress, and playable in parts:
   - An overlay (F1) with a per-hunter blacksmith wishlist: materials needed against your item box and pouch, a shopping list and
     a notice when a piece can be made.
   - Opt-in native in-game menus.
-- **Not yet:** a complete renderer, the hash check of the dump, and CI. See [`docs/roadmap.md`](docs/roadmap.md) for what is next.
+- **Not yet:** a few graphics glitches (such as shadow streaking on the player outside the village), the hash check of the dump, and CI. See [`docs/roadmap.md`](docs/roadmap.md) for what is next.
 
 ## Supported game version
 

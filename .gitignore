@@ -39,3 +39,6 @@ wishlist.json
 wishlist.json.migrated
 wishlists/
 mh3u_latest.log
+
+# the game's icon and any other image from a dump
+*.tga

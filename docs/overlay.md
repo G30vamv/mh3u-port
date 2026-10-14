@@ -167,6 +167,16 @@ found it by). The file name is the name with anything but ASCII letters, digits,
 - **Known limit:** two save slots with the same hunter name share a list.
 - **Searching with the overlay closed:** the overlay looks for the live save now and then while any hunter's list is non-empty.
 
+## The window icon
+
+`mh3u-gfx/src/icon.rs` sets the window's icon when the window opens.
+- **Where it comes from:** `run` asks the dump for `meta/iconTex.tga` (`Dump::meta`: the base game's folder first, then the
+  update's), from the games folder given by `-Games`, `--games` or `MH3U_GAMES`.
+- **How it is read:** `mh3u_formats::tga` decodes it (true colour, plain or run-length, 24 or 32 bits). It is scaled to 64x64
+  for the window, and on Windows to 128x128 for the taskbar (`with_taskbar_icon`).
+- **No copies:** nothing is written to disk. `*.tga` is in `.gitignore` so a copied icon cannot be committed.
+- **When it fails:** a missing or unreadable file keeps the default icon, with one `[icon]` line in the log.
+
 ## The software keyboard
 
 When the game asks for text (a new hunter's name), the overlay opens by itself with a "Keyboard" window. Type the name (at most

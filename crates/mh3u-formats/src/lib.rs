@@ -9,4 +9,5 @@ pub mod gmd;
 mod hostile_tests;
 pub mod inflate;
 pub mod rpx;
+pub mod tga;
 pub mod tiling;

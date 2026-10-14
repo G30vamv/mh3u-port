@@ -174,7 +174,7 @@ pouch. Saves go to `<out>/save`.
 | `mh3u-cemu` | reads a running Cemu's memory (Linux), to compare the port with the emulator |
 | `mh3u-tools` | the command line: `translate`, `build-game`, `run`, `dump`, `disasm` and the explorers |
 
-Documentation: [`docs/README.md`](docs/README.md). Before every commit, run `scripts/check.sh` (or `scripts\check.ps1`): format,
+Documentation: [`docs/README.md`](docs/README.md). To contribute, see [`CONTRIBUTING.md`](CONTRIBUTING.md). Before every commit, run `scripts/check.sh` (or `scripts\check.ps1`): format,
 clippy with warnings as errors, and the tests.
 
 ## Legal

@@ -24,6 +24,7 @@ pub mod mods;
 pub mod native_menu;
 pub mod native_text;
 pub mod scene;
+pub mod swkbd;
 mod sync;
 
 pub use fs::Roots;

@@ -166,3 +166,10 @@ found it by). The file name is the name with anything but ASCII letters, digits,
   `wishlist.json.migrated` so no other hunter gets it.
 - **Known limit:** two save slots with the same hunter name share a list.
 - **Searching with the overlay closed:** the overlay looks for the live save now and then while any hunter's list is non-empty.
+
+## The software keyboard
+
+When the game asks for text (a new hunter's name), the overlay opens by itself with a "Keyboard" window. Type the name (at most
+10 characters) and press Enter or OK; Cancel cancels. The overlay closes again once the game has the text. To skip the window,
+set `MH3U_SWKBD_TEXT=<name>` and the game gets that name at once. Typing needs a keyboard, so a gamepad-only player should use
+the variable. How the keyboard is answered: `docs/translator.md`, "Software keyboard".

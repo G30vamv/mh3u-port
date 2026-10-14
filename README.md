@@ -13,6 +13,9 @@ emulator is involved at run time.
 
 ## Status
 
+Listed on [recomp.fyi](https://recomp.fyi/) (the listing comes from [`.recomp.json`](.recomp.json); edit that file to change it).
+
+
 Work in progress, and playable in parts:
 
 - **Runs:** it boots and reaches the title screen, character creation (including naming a hunter) and the village. It runs quests,

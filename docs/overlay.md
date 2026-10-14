@@ -78,16 +78,16 @@ borderless fullscreen on the window's monitor.
 
 ## The companion's code
 
-[glinesbdev/mh3u-companion](https://github.com/glinesbdev/mh3u-companion) is public domain, like this project. Its crate
+[glinesbdev/mh3u-companion](https://github.com/glinesbdev/mh3u-companion) is public domain, so its code can be used here (this project is AGPL-3.0). Its crate
 `mh3u-core` would be the natural dependency, but it does not build for Windows: its `/proc` memory reader uses `std::os::unix`, and
 that is not optional. So the six modules the wishlist needs are copied into `crates/mh3u-mods/src/companion/`, from commit `563aa22`:
 `arc`, `inflate`, `gmd`, `rpx`, `recipes` and `save`. Their header says where they come from and what changed (the tests and one
 function that needs the drop tables were left out). If the companion puts its `/proc` reader behind `cfg(unix)` or a feature, the
-copy can become a git dependency (the repository is private, so cargo would fetch it with `net.git-fetch-with-cli`).
+copy can become a git dependency.
 
 ## Run 27 (PR #11, merged in fab2efe): it works
 
-- **The live save was found** at `0x2e686b00` (Hunter), by the hunter's name with the word at +0x24 pointing at itself. That is the
+- **The live save was found** at `0x2e686b00` (the test hunter), by the hunter's name with the word at +0x24 pointing at itself. That is the
   port's form of the companion's header; the word at +0x08 is 0 here. The first search, before the hunter was loaded, found nothing
   and the next one 5 s later found it.
 - **The game data** loaded once from the dump: 1551 items, 2155 recipes, 1437 upgrades.
@@ -150,7 +150,7 @@ The live save holds no slot number, so a list belongs to the hunter's name (the 
 found it by). The file name is the name with anything but ASCII letters, digits, `-` and `_` written as `~` and hex bytes.
 
 - **In game or not:** the save alone does not tell. At the title screen ("PRESS A") the slot's data is already in memory (PR #25's
-  first test showed Hunter's list there). So the overlay accepts a hunter only while the game's current area is an in-game one.
+  first test showed the copied save's hunter's list there). So the overlay accepts a hunter only while the game's current area is an in-game one.
   It reads the area as `mh3u-rt/src/scene.rs` describes: `sArea`'s areas and each one's class. The village, harbor, quests, lobby,
   results and arena count as in game. The title (`aStartMenu`), boot, options, gallery and data transfer count as not. A change is
   logged as `[scene] InGame (areas: aVillage)`. Leaving for the title counts as unloading. `MH3U_SCENE_CHECK=off` skips the check.

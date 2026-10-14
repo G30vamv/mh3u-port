@@ -1,6 +1,6 @@
 # A PC port of Monster Hunter 3 Ultimate: a proposal
 
-Status: **written as a proposal before the port was built; the spikes are done (`docs/spikes.md`) and the port now exists.** The
+Status (this is the original proposal, kept for its reasoning; the [README](../README.md) has setup and status): **written as a proposal before the port was built; the spikes are done (`docs/spikes.md`) and the port now exists.** The
 translator, the runtime and the graphics run the game to its character screen and the village (steps 4 to 6 below, and input from step 7);
 `docs/translator.md` says how, and what is not done. The plan below is kept as it was argued, with the crate table brought up to date.
 This document says what the project would be, what it needs from you, how it would be
@@ -144,7 +144,7 @@ Not before step 5 works: any promise of dates.
   use hashes and addresses, not the game's contents.
 - The ownership check is part of the program and is not to be weakened, made optional or hidden behind a flag.
 - Third-party data used for what the game's files do not hold is credited, as in the companion app.
-- Licence: this repository is public domain (see `LICENSE`). The port's own code would be the same. That covers *our* code only;
+- Licence: the port's own code is under the GNU AGPL-3.0 (see `LICENSE`; earlier versions were public domain). That covers *our* code only;
   it does not say anything about the game, which stays Capcom's.
 
 ## Risks and open questions

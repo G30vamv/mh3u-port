@@ -82,7 +82,7 @@ from the update first, then the base game, so both should be there. The translat
 outside any git working tree, which `translate` checks:
 
 ```powershell
-$games = 'C:\path\to\your\wiiu'           # the folder with the [Game] and [Update] folders
+$games = 'D:\path\to\your\games'           # the folder with the [Game] and [Update] folders
 $out   = "$env:LOCALAPPDATA\mh3u\c"       # anywhere outside the repository
 & $tools dump $games                       # says which folders it found
 & $tools translate $games $out
@@ -101,7 +101,7 @@ face button was taken as).
 ### The same with the scripts
 
 `scripts\win-build.ps1` and `scripts\win-run.ps1` do the steps above, for Windows PowerShell 5.1 or PowerShell 7. They take the
-games from `-Games` (`$env:USERPROFILE\path\to\games` by default) and put the C, `game.dll` and its caches in `-Out`
+games from `-Games`, or from `MH3U_GAMES` when it is not given (one of them is required; `win-build.ps1` needs it only to translate), and put the C, `game.dll` and its caches in `-Out`
 (`$env:LOCALAPPDATA\mh3u\c` by default). Paths with square brackets, such as the dumps' own folders, are fine. Run them from the
 repository or from anywhere:
 

@@ -15,14 +15,14 @@ param(
     # Where the translated C and game.dll go (outside any git working tree).
     [string]$Out = (Join-Path $env:LOCALAPPDATA 'mh3u\c'),
     # The folder with the [Game] and [Update] dumps.
-    [string]$Games = (Join-Path $env:USERPROFILE 'path\to\games')
+    [string]$Games = $env:MH3U_GAMES
 )
 $ErrorActionPreference = 'Stop'
 # PowerShell 7.3+: a native command's exit code is checked here, not turned into an error
 $PSNativeCommandUseErrorActionPreference = $false
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 # full paths, from where the script was started (they need not exist yet)
-$Games = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Games)
+if ($Games) { $Games = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Games) }
 $Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
 
 function Step([string]$Command, [string[]]$Arguments) {
@@ -52,8 +52,11 @@ try {
         throw "no $tools after the build"
     }
     if ($Translate -or -not (Test-Path -LiteralPath (Join-Path $Out 'game.h'))) {
+        if (-not $Games) {
+            throw "no games folder: pass -Games <folder with the [Game] and [Update] dumps> or set MH3U_GAMES"
+        }
         if (-not (Test-Path -LiteralPath $Games)) {
-            throw "no games folder at $Games (pass -Games)"
+            throw "no games folder at $Games (pass -Games or set MH3U_GAMES)"
         }
         Step $tools @('translate', $Games, $Out)
     }

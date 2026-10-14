@@ -105,6 +105,15 @@ impl Dump {
             .with_context(|| format!("no .rpx in {}", self.base.join("code").display()))
     }
 
+    /// A file of the dump's `meta` folder (such as `iconTex.tga`): the base game's copy when it has one, else the update's.
+    pub fn meta(&self, name: &str) -> Option<PathBuf> {
+        [Some(self.base.as_path()), self.update.as_deref()]
+            .into_iter()
+            .flatten()
+            .map(|f| f.join("meta").join(name))
+            .find(|p| p.is_file())
+    }
+
     /// A file of the game's content: the update's copy when it has one, else the base game's.
     pub fn content(&self, relative: &str) -> Option<PathBuf> {
         [self.update.as_deref(), Some(self.base.as_path())]

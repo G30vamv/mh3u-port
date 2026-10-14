@@ -150,6 +150,10 @@ Full details and troubleshooting: [`docs/windows.md`](docs/windows.md).
 | `MH3U_GFX_RESOLUTION_SCALE=1..4` (`-Scale` / `--scale`) | The internal resolution. |
 | `MH3U_AUDIO=off`, `MH3U_AUDIO_FX=off` | No sound, or no reverb and filter. |
 
+**Window icon:** the window, and on Windows the taskbar, use the game's own icon, read from your dump's `meta/iconTex.tga`
+(the base game's, else the update's). It is only read, never copied, and no artwork is in this repository. If the file is
+missing or can't be read, the default icon stays and the log says why in one `[icon]` line.
+
 The mods only read the game's memory. The opt-in native menus change on-screen text and menu state, and never your save or
 pouch. Saves go to `<out>/save`.
 

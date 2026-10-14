@@ -7,6 +7,7 @@ mod draw_bench;
 pub mod events;
 mod geometry;
 mod gx2;
+pub mod icon;
 pub mod kbm;
 pub mod overlay;
 mod perf;
@@ -264,6 +265,7 @@ impl<F: FnOnce(Display) + Send + 'static> ApplicationHandler for App<F> {
             .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
             .with_fullscreen(borderless(self.fullscreen));
         self.size = (1280.0, 720.0);
+        let attributes = icon::apply(attributes);
         let made = event_loop
             .create_window(attributes)
             .context("opening the window")

@@ -977,6 +977,8 @@ fn run_game(dump: &Dump, c_dir: &Path, max_imports: u64, save: PathBuf, window: 
     let fullscreen = mh3u_gfx::fullscreen_wanted(fullscreen, std::env::var("MH3U_FULLSCREEN").ok().as_deref());
     // the keyboard and mouse bindings are kept with the build, like the wishlist
     let bindings = c_dir.join("input").join("bindings.json");
+    // the window's icon is the game's own, read from the dump's meta folder (never copied anywhere)
+    mh3u_gfx::icon::use_file(dump.meta("iconTex.tga"));
     mh3u_gfx::run(fullscreen, Some(bindings), move |display| {
         let mut options = options;
         let mut gx2 = mh3u_gfx::Gx2::new(display);

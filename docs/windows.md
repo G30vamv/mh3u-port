@@ -98,6 +98,9 @@ number to play. The variables of `translator.md` work the same in PowerShell: `$
 swapped, `$env:MH3U_PAD_LAYOUT = 'nintendo'` swaps A with B and X with Y (the log's `[gamepad] … is the GamePad's …` lines say what each
 face button was taken as).
 
+The window and the taskbar show the game's icon from your dump (`meta/iconTex.tga`, read at start and kept only in memory).
+`[icon] the game's icon from …` in the log says it was found. Without it, Windows shows the default icon.
+
 ### The same with the scripts
 
 `scripts\win-build.ps1` and `scripts\win-run.ps1` do the steps above, for Windows PowerShell 5.1 or PowerShell 7. They take the

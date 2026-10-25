@@ -1,10 +1,14 @@
 //! The graphics API (`gx2`). For now only what the game needs to size its buffers: nothing is drawn yet.
 //!
 //! The surface sizes follow the console's tiling rules (see `mh3u_formats::tiling`), as `GX2CalcSurfaceSizeAndAlignment` does.
+//!
+//! Tiling apertures (`GX2AllocateTilingApertureEx`) give the CPU a linear view of a tiled surface. The game reads one to find the
+//! colour under the cursor in character creation's custom colour picker (issue #31: without them every custom colour was black).
 
 use crate::cafe::SimpleHandler;
 use crate::guest::Guest;
-use mh3u_formats::tiling::{self, TileMode};
+use mh3u_formats::tiling::{self, Surface, TileMode};
+use std::collections::BTreeMap;
 
 pub fn find(name: &str) -> Option<SimpleHandler> {
     Some(match name {
@@ -22,6 +26,22 @@ pub fn find(name: &str) -> Option<SimpleHandler> {
             write_size(g, c.r[6], c.r[7], w, h, c.r[4], c.r[5]);
         },
         "gx2:GX2CalcDRCSize" => |_, g, c| write_size(g, c.r[6], c.r[7], 854, 480, c.r[4], c.r[5]),
+        // (format): the bits in one element (a texel, or a 4 x 4 block of a compressed format)
+        "gx2:GX2GetSurfaceFormatBits" => |_, _, c| c.r[3] = element(c.r[3]).0 * 8,
+        // (surface, level): the level's pitch in elements
+        "gx2:GX2GetSurfaceMipPitch" => |_, g, c| c.r[3] = mip_pitch(g, c.r[3], c.r[4]),
+        // (surface, level, slice, endian swap mode, *handle, *address)
+        "gx2:GX2AllocateTilingApertureEx" => |os, g, c| {
+            let (handle, address) = os.apertures.open(g, c.r[3], c.r[4], c.r[5], c.r[6]).unwrap_or((0, 0));
+            if c.r[7] != 0 {
+                g.put_u32(c.r[7], handle);
+            }
+            if c.r[8] != 0 {
+                g.put_u32(c.r[8], address);
+            }
+        },
+        // (handle): what was written through the aperture goes back into the surface
+        "gx2:GX2FreeTilingAperture" => |os, g, c| os.apertures.close(g, c.r[3]),
         _ => return None,
     })
 }
@@ -67,6 +87,177 @@ fn level_count(dim: u32, w: u32, h: u32, d: u32, asked: u32) -> u32 {
         levels = levels.max(bits(d));
     }
     levels
+}
+
+/// One mip level of a surface as it is laid out: where it starts, its layout, the bits per element and the tiling address inputs.
+struct Level {
+    base: u32,
+    surface: Surface,
+    size: u64,
+}
+
+/// Where `level` of the surface at `s` is and how it is laid out, by the same rules `GX2CalcSurfaceSizeAndAlignment` used.
+fn level_layout(g: &Guest, s: u32, level: u32) -> Option<Level> {
+    let (dim, width, height, depth, levels, format) = (
+        g.u32(s),
+        g.u32(s + 4),
+        g.u32(s + 8),
+        g.u32(s + 0xc),
+        g.u32(s + 0x10),
+        g.u32(s + 0x14),
+    );
+    if level >= levels.max(1) || level > 13 || width == 0 {
+        return None;
+    }
+    let base = match level {
+        0 => g.u32(s + 0x24),
+        1 => g.u32(s + 0x2c),
+        n => g.u32(s + 0x2c).wrapping_add(g.u32(s + 0x3c + 4 * n)),
+    };
+    if base == 0 {
+        return None;
+    }
+    let (bytes, compressed) = element(format);
+    let mip = |v: u32| (v >> level).max(1);
+    let slices = match dim {
+        2 => mip(depth),
+        3 => depth.max(6),
+        4 | 5 | 7 => depth,
+        _ => 1,
+    };
+    let info = tiling::surface_info(&tiling::Request {
+        mode: TileMode::from_number(g.u32(s + 0x30)).unwrap_or(TileMode::LinearAligned),
+        bits_per_element: bytes * 8,
+        compressed,
+        width: mip(width),
+        height: if dim == 0 || dim == 4 { 1 } else { mip(height) },
+        slices: slices.max(1),
+        samples: 1 << g.u32(s + 0x18).min(3),
+        level,
+        cube: dim == 3,
+        depth: g.u32(s + 0x1c) & 4 != 0,
+        display: g.u32(s + 0x1c) & 8 != 0,
+    });
+    let samples = 1 << g.u32(s + 0x18).min(3);
+    let (pipe_swizzle, bank_swizzle) = tiling::swizzles(g.u32(s + 0x34));
+    Some(Level {
+        base,
+        surface: Surface {
+            mode: info.mode,
+            bits_per_element: bytes * 8,
+            pitch: info.pitch,
+            height: info.height,
+            samples,
+            depth: g.u32(s + 0x1c) & 4 != 0,
+            pipe_swizzle,
+            bank_swizzle,
+        },
+        size: info.size / u64::from(info.slices.max(1)),
+    })
+}
+
+/// `GX2GetSurfaceMipPitch(surface, level)`: the pitch of a level in elements (level 0's is the surface's own).
+fn mip_pitch(g: &Guest, s: u32, level: u32) -> u32 {
+    if level == 0 {
+        return g.u32(s + 0x3c);
+    }
+    level_layout(g, s, level).map_or(0, |l| l.surface.pitch)
+}
+
+/// Where tiling apertures are put in the guest's address space: a range nothing else uses (memory is committed when touched).
+const APERTURES: (u32, u32) = (0xe800_0000, 0x0800_0000);
+
+/// The tiling apertures the game has open, by handle.
+#[derive(Default)]
+pub struct Apertures {
+    next: u32,
+    open: BTreeMap<u32, Aperture>,
+}
+
+/// A linear copy of one slice of a surface level, at `address`, and where its elements are in the surface.
+struct Aperture {
+    address: u32,
+    len: u32,
+    base: u32,
+    surface: Surface,
+    slice: u32,
+    endian: u32,
+}
+
+impl Aperture {
+    /// Copies the surface into the aperture (`into_aperture`) or the aperture back into the surface, element by element.
+    fn copy(&self, g: &Guest, into_aperture: bool) {
+        let s = &self.surface;
+        let bytes = (s.bits_per_element / 8).max(1) as usize;
+        let mut element = vec![0u8; bytes];
+        for y in 0..s.height {
+            for x in 0..s.pitch {
+                let linear = self.address + (y * s.pitch + x) * bytes as u32;
+                let tiled = self.base.wrapping_add(tiling::address(s, x, y, self.slice, 0) as u32);
+                let (from, to) = if into_aperture { (tiled, linear) } else { (linear, tiled) };
+                g.read(from, &mut element);
+                swap(&mut element, self.endian, bytes);
+                g.write(to, &element);
+            }
+        }
+    }
+}
+
+/// Turns the bytes of one element around as an endian swap mode says (0: none, 1: 8 in 16, 2: 8 in 32, 3: the format's own size).
+fn swap(element: &mut [u8], endian: u32, bytes: usize) {
+    let unit = match endian {
+        1 => 2,
+        2 => 4,
+        3 if bytes == 2 => 2,
+        3 if bytes >= 4 => 4,
+        _ => return,
+    };
+    for chunk in element.chunks_exact_mut(unit) {
+        chunk.reverse();
+    }
+}
+
+impl Apertures {
+    /// Opens an aperture on `slice` of `level` of the surface at `s`: (handle, address), or nothing for a level that is not there.
+    fn open(&mut self, g: &Guest, s: u32, level: u32, slice: u32, endian: u32) -> Option<(u32, u32)> {
+        let l = level_layout(g, s, level)?;
+        let bytes = u64::from((l.surface.bits_per_element / 8).max(1));
+        let len = (u64::from(l.surface.pitch) * u64::from(l.surface.height) * bytes).max(l.size);
+        let len = u32::try_from(len.div_ceil(0x100) * 0x100).ok()?;
+        // the lowest gap that fits, after the apertures open now
+        let mut taken: Vec<(u32, u32)> = self.open.values().map(|a| (a.address, a.len)).collect();
+        taken.sort_unstable();
+        let mut at = APERTURES.0;
+        for (address, used) in taken {
+            if at.checked_add(len)? <= address {
+                break;
+            }
+            at = at.max(address + used);
+        }
+        if u64::from(at) + u64::from(len) > u64::from(APERTURES.0) + u64::from(APERTURES.1) {
+            return None;
+        }
+        self.next = self.next.wrapping_add(1).max(1);
+        let a = Aperture {
+            address: at,
+            len,
+            base: l.base,
+            surface: l.surface,
+            slice,
+            endian,
+        };
+        g.fill(at, 0, len);
+        a.copy(g, true);
+        self.open.insert(self.next, a);
+        Some((self.next, at))
+    }
+
+    /// Closes an aperture: its contents go back into the surface (the console's aperture is a view, so writes through it land there).
+    fn close(&mut self, g: &Guest, handle: u32) {
+        if let Some(a) = self.open.remove(&handle) {
+            a.copy(g, false);
+        }
+    }
 }
 
 /// `GX2CalcSurfaceSizeAndAlignment(surface)`: resolves the tile mode and fills in the image size, mip size, alignment, pitch,
@@ -186,5 +377,72 @@ fn calc_surface(g: &Guest, s: u32) {
     g.put_u32(s + 0x10, levels);
     for (i, o) in offsets.iter().take(13).enumerate() {
         g.put_u32(s + 0x40 + 4 * i as u32, *o);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cafe::{Handler, Os, find};
+
+    fn call(os: &mut Os, g: &Guest, name: &str, r: &[u32]) -> u32 {
+        let mut c = crate::game::new_ctx(std::ptr::null_mut());
+        c.r[3..3 + r.len()].copy_from_slice(r);
+        let Some(Handler::Simple(h)) = find(name) else { panic!("{name}") };
+        h(os, g, &mut c);
+        c.r[3]
+    }
+
+    /// A tiled 2D RGBA8 surface as the picker's palette is: the aperture shows its texels in rows, and closing it puts them back.
+    #[test]
+    fn a_tiling_aperture_is_a_linear_view_of_a_tiled_surface() {
+        let mut memory = crate::memory::GuestMemory::reserve().expect("guest memory");
+        let g = Guest::new(memory.as_mut_ptr());
+        let mut os = Os::new(&g);
+        let (s, image, out) = (0x2000_0000, 0x2010_0000, 0x2000_1000);
+        // 2D, 128 x 64, one level, RGBA8 (0x1a), used as a texture, tile mode 2D thin (4)
+        for (at, v) in [(0, 1), (4, 128), (8, 64), (0xc, 1), (0x10, 1), (0x14, 0x1a), (0x1c, 1), (0x30, 4)] {
+            g.put_u32(s + at, v);
+        }
+        call(&mut os, &g, "gx2:GX2CalcSurfaceSizeAndAlignment", &[s]);
+        assert_eq!(g.u32(s + 0x30), 4, "stays tiled");
+        g.put_u32(s + 0x24, image);
+        let pitch = call(&mut os, &g, "gx2:GX2GetSurfaceMipPitch", &[s, 0]);
+        assert_eq!(pitch, g.u32(s + 0x3c));
+        assert_eq!(call(&mut os, &g, "gx2:GX2GetSurfaceFormatBits", &[0x1a]), 32);
+        let (pipe_swizzle, bank_swizzle) = tiling::swizzles(g.u32(s + 0x34));
+        let layout = Surface {
+            mode: TileMode::TwoDThin1,
+            bits_per_element: 32,
+            pitch,
+            height: 64,
+            samples: 1,
+            depth: false,
+            pipe_swizzle,
+            bank_swizzle,
+        };
+        let texel = |x: u32, y: u32| (y << 16) | x | 0x8000_0000;
+        for y in 0..64 {
+            for x in 0..128 {
+                g.put_u32(image + tiling::address(&layout, x, y, 0, 0) as u32, texel(x, y));
+            }
+        }
+        call(&mut os, &g, "gx2:GX2AllocateTilingApertureEx", &[s, 0, 0, 0, out, out + 4]);
+        let (handle, view) = (g.u32(out), g.u32(out + 4));
+        assert_ne!(handle, 0);
+        assert_ne!(view, 0);
+        for (x, y) in [(0, 0), (1, 0), (7, 3), (100, 37), (127, 63)] {
+            assert_eq!(g.u32(view + (y * pitch + x) * 4), texel(x, y), "({x}, {y})");
+        }
+        // a write through the aperture reaches the surface when it is closed
+        g.put_u32(view + (5 * pitch + 9) * 4, 0x1234_5678);
+        call(&mut os, &g, "gx2:GX2FreeTilingAperture", &[handle]);
+        assert_eq!(g.u32(image + tiling::address(&layout, 9, 5, 0, 0) as u32), 0x1234_5678);
+        assert_eq!(g.u32(image + tiling::address(&layout, 10, 5, 0, 0) as u32), texel(10, 5));
+        // 8-in-32 turns each texel's bytes around
+        call(&mut os, &g, "gx2:GX2AllocateTilingApertureEx", &[s, 0, 0, 2, out, out + 4]);
+        assert_eq!(g.u32(g.u32(out + 4) + 4), texel(1, 0).swap_bytes());
+        call(&mut os, &g, "gx2:GX2FreeTilingAperture", &[g.u32(out)]);
+        assert_eq!(g.u32(image + tiling::address(&layout, 1, 0, 0, 0) as u32), texel(1, 0));
     }
 }

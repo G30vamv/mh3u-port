@@ -481,6 +481,13 @@ Each of these was found by looking at what the game was waiting for, with the de
   3 ms frame of the voices, paced by the sound device (`cpal`). A voice's position, which the game polls to refill its streams and to
   know that a sound ended, moves with what is mixed. `MH3U_AUDIO=off` mixes without playing.
 - **Alarms** (`OSSetAlarm`...) run their handlers on a thread of their own when they are due.
+- **Tiling apertures** (`GX2AllocateTilingApertureEx`, `GX2FreeTilingAperture`, with `GX2GetSurfaceMipPitch` and
+  `GX2GetSurfaceFormatBits`), in `mh3u-rt/src/gx2.rs`: every custom colour in character creation came out black (issue #31). The
+  picker (`FUN_0274c1ec`) reads the texel under the cursor from a CPU copy of its palette texture, which `FUN_0274a9f0` makes through
+  a tiling aperture (`FUN_02957070`), a linear view of the tiled texture. With the four calls stubbed the aperture's address was 0,
+  so the copy was zeros and every pick was black (the presets are a table, so they worked). Now an aperture is a linear copy of
+  the level's slice at `0xe8000000` and up, with the bytes turned around as the endian mode asks, and closing it writes the copy
+  back into the surface.
 - **Software keyboard** (`swkbd.rpl`, found at run time with `OSDynLoad_FindExport`): answered by the host in
   `mh3u-rt/src/swkbd.rs`. The name field on the character screen used to stop after its notice. The cause: the game's keyboard
   set-up (`FUN_0293af30`) calls `SwkbdInitLearnDic` once per controller and gives up at the first 0, and every stub returned 0. So

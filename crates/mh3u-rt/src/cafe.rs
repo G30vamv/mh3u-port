@@ -586,6 +586,8 @@ pub struct Os {
     pad_read_at: std::time::Instant,
     pad_script: Option<(u32, std::time::Duration)>,
     pub started: std::time::Instant,
+    /// The tiling apertures the game has open (`GX2AllocateTilingApertureEx`).
+    pub apertures: crate::gx2::Apertures,
 }
 
 /// Lines saying which audio functions (`snd_core`, `snd_user` and their newer names) the game imports, done and not done.
@@ -712,6 +714,7 @@ impl Os {
                 ))
             }),
             started: std::time::Instant::now(),
+            apertures: Default::default(),
         };
         os.thread = os.carve(g, 0x6a0);
         os.system_info = os.carve(g, 0x40);

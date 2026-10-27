@@ -7,8 +7,17 @@ keyboard and mouse work together at any time:
 
 ## Keyboard and mouse (PR #12)
 
-On by default; `MH3U_KBM=off` turns them off. The keyboard then does nothing, and the mouse's left button touches the GamePad's
-screen, as before.
+**Off by default since PR #34** (they were on before): `MH3U_KEYBOARD_CONTROLS=1` (`win-run.ps1 -KeyboardControls`,
+`run.sh --keyboard-controls`) turns them on. `MH3U_KBM` is no longer read (the log says so when it is set).
+
+Without them, the window never grabs or hides the cursor, the mouse does not turn the camera, no key moves the hunter or presses a
+GamePad button (the native menu's mod key included; ZL on a pad does the same), and the mouse's left button touches the GamePad's
+screen. What still works without them, with the window focused:
+- **F1** opens and closes the overlay, and the open overlay takes the mouse and keyboard as always: clicking, scrolling, typing in
+  its search and text fields (the naming keyboard too).
+- **F11** and **Alt+Enter** (fullscreen), **F9** and **F10** (the hook-finding tools' keys, `hooks.md`), and closing the window.
+
+With them on:
 - **The bindings** are in `<build dir>/input/bindings.json`, made with the defaults on the first run. Edit it and restart. Fields
   left out keep their defaults. A file that cannot be read gives the defaults and one `[input]` line saying why; the file is left
   as it is.
@@ -53,7 +62,8 @@ Shift L3 and R3, and the arrows the right stick. The file replaces it.
 - **Keys** are named by position as winit names them (`KeyQ`, `Digit1`, `Space`, `ShiftLeft`, `ControlLeft`, `Tab`, `Escape`,
   `ArrowUp`...), so they do not move with the keyboard layout. Mouse buttons are `MouseLeft`, `MouseRight`, `MouseMiddle`,
   `MouseBack` and `MouseForward`.
-- **Right Shift** is left unbound by default: it is the opt-in native Mods entry's key (`MH3U_NATIVE_MENU`, `native-menu.md`).
+- **Right Shift** is left unbound by default: it is the opt-in native Mods entry's key (`MH3U_NATIVE_MENU`, `native-menu.md`), and like
+  the other keys it counts only with keyboard controls on.
   On a gamepad, **ZL** held does the same. With that opt-in on, ZL is kept from the game while the start menu or the Mods page
   is up, so it cannot trigger anything there. It works as usual everywhere else.
 - **The left stick:** a diagonal goes as far as a straight push (it is normalised), and the walk key scales it by `walk_scale`.
@@ -87,7 +97,7 @@ Two separate settings, so a pad can keep playing while someone else uses the PC:
 | Setting | Default | What it does |
 |---|---|---|
 | `MH3U_BACKGROUND_GAMEPAD` (`win-run.ps1 -NoBackgroundGamepad`, `run.sh --no-background-gamepad` set it to `0`) | **on** | Gamepads keep playing when the window does not have the focus. `0` (or `off`) keeps them to the focused window. |
-| `MH3U_BACKGROUND_KEYBOARD` (`-BackgroundKeyboard`, `--background-keyboard` set it to `1`) | off | The keyboard's bindings also play without the focus. Opt-in, so typing elsewhere does not move the hunter. |
+| `MH3U_BACKGROUND_KEYBOARD` (`-BackgroundKeyboard`, `--background-keyboard` set it to `1`) | off | With keyboard controls on (`MH3U_KEYBOARD_CONTROLS=1`), the keyboard's bindings also play without the focus. Opt-in, so typing elsewhere does not move the hunter. Without keyboard controls it does nothing (the log says so). |
 
 - **The mouse** never plays in the background: it is only the right stick while the cursor is grabbed, which needs the focus.
 - **Windows:** gilrs's backend (Windows.Gaming.Input) hears nothing while no window of the process has the focus, so without the

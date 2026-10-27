@@ -200,7 +200,8 @@ default; `win-run.ps1 -NativeMenu` (`run.sh --native-menu`) turns it on. It need
 - **The mod key:** **Right Shift** by default (unbound in the default keyboard controls, `input.md`). `MH3U_NATIVE_MENU_KEY`
   (`-NativeMenuKey`, `--native-menu-key`) takes another key, named as winit names keys (`AltLeft`, `KeyM`, `F2`...). A key that
   is also bound to a GamePad button still presses that button. The window sets the key's state with the other keys; it is let
-  go when the window loses the focus. Gamepad-only players need a keyboard for it for now.
+  go when the window loses the focus. The key counts only with keyboard controls on (`MH3U_KEYBOARD_CONTROLS=1`, off by
+  default since PR #34); without them, ZL on a gamepad is the modifier.
 - **While the key is held, the Hunter tab up (`S+0x25` = 0, `S+0x1f` = 0) and at least 5 rows:**
   - **Label:** row 4's label pointer (`S+0xb0 + 4*0x18 + 8`) points at "Mods" in the runtime's buffer (`0x0ff00100`, past the
     native text's 64 bytes). `f_0215249c` refills the labels every frame, so the pointer is set on `menu_rows`, the entry of

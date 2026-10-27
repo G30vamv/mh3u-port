@@ -1,6 +1,7 @@
 //! Keyboard and mouse controls: keys and mouse buttons onto the GamePad's buttons, WASD onto the left stick, and the mouse onto the
 //! right stick (`mh3u_rt::input::MouseStick`). The bindings are kept in a JSON file the player can edit, made with the defaults the
-//! first time; `MH3U_KBM=off` turns keyboard and mouse controls off (the mouse is then the GamePad's touch screen, as before).
+//! first time. They are off by default and `MH3U_KEYBOARD_CONTROLS=1` turns them on; while off, the mouse is the GamePad's touch screen
+//! and is never grabbed.
 //!
 //! Keys are named by position as `winit` names them (`KeyW`, `Space`, `ShiftLeft`, `Digit1`...), so they do not depend on the
 //! keyboard's layout; mouse buttons are `MouseLeft`, `MouseRight`, `MouseMiddle`, `MouseBack` and `MouseForward`.
@@ -181,9 +182,10 @@ impl Bindings {
     }
 }
 
-/// Whether keyboard and mouse controls are on (`MH3U_KBM=off` turns them off).
+/// Whether keyboard and mouse controls are on: only with `MH3U_KEYBOARD_CONTROLS=1` (off by default since PR #34, so that the
+/// window never grabs the cursor or takes the keys unless asked to).
 pub fn enabled(value: Option<&str>) -> bool {
-    !matches!(value.map(str::trim), Some("off" | "0"))
+    mh3u_rt::input::switch_setting(value, false)
 }
 
 /// The bindings in `path`, made there with the defaults when there is no file. A file that cannot be read gives the defaults, and
@@ -297,7 +299,10 @@ mod tests {
             "a broken file is left for the player to mend"
         );
         std::fs::remove_dir_all(dir).unwrap();
-        assert!(enabled(None) && !enabled(Some("off")));
+        assert!(
+            !enabled(None) && !enabled(Some("off")) && enabled(Some("1")),
+            "off unless asked for"
+        );
     }
 
     #[test]

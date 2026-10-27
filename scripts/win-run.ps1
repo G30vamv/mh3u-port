@@ -37,7 +37,12 @@ param(
     # (MH3U_NATIVE_MENU; docs/native-menu.md). Needs a build translated with the current mods/hooks.txt (win-build.ps1 -Translate).
     [switch]$NativeMenu,
     # The mod key for -NativeMenu, as winit names keys (ShiftRight, AltLeft, KeyM...; MH3U_NATIVE_MENU_KEY). Default ShiftRight.
-    [string]$NativeMenuKey
+    [string]$NativeMenuKey,
+    # Gamepads keep playing while the window is in the background (on by default; issue #33): this turns that off
+    # (MH3U_BACKGROUND_GAMEPAD=0; docs/input.md).
+    [switch]$NoBackgroundGamepad,
+    # Opt-in: the keyboard also plays while the window is in the background (MH3U_BACKGROUND_KEYBOARD=1; not the mouse; docs/input.md).
+    [switch]$BackgroundKeyboard
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -59,7 +64,7 @@ $stale = @(
     'MH3U_FPS', 'MH3U_GFX_TIMES', 'MH3U_GFX_REPORT', 'MH3U_GFX_LOG', 'MH3U_GFX_DUMP_FRAME', 'MH3U_GFX_DUMP_DIR',
     'MH3U_GFX_DEBUG_PS', 'MH3U_GFX_DEBUG_PS_ONLY', 'MH3U_GFX_SOLID', 'MH3U_GFX_DEPTH_BIAS', 'MH3U_GFX_TEXDUMP',
     'MH3U_GFX_SAVE', 'MH3U_GFX_SAVE_EVERY', 'MH3U_GFX_SAVE_IMAGE', 'MH3U_PAD_LAYOUT', 'MH3U_GFX_RESOLUTION_SCALE', 'MH3U_NATIVE_TEXT', 'MH3U_MENU_PROBE',
-    'MH3U_NATIVE_MENU', 'MH3U_NATIVE_MENU_KEY'
+    'MH3U_NATIVE_MENU', 'MH3U_NATIVE_MENU_KEY', 'MH3U_BACKGROUND_GAMEPAD', 'MH3U_BACKGROUND_KEYBOARD'
 )
 foreach ($name in $stale) {
     if (Test-Path -LiteralPath "Env:$name") {
@@ -103,6 +108,12 @@ if ($NativeMenu) {
 }
 if ($NativeMenuKey) {
     $set['MH3U_NATIVE_MENU_KEY'] = $NativeMenuKey
+}
+if ($NoBackgroundGamepad) {
+    $set['MH3U_BACKGROUND_GAMEPAD'] = '0'
+}
+if ($BackgroundKeyboard) {
+    $set['MH3U_BACKGROUND_KEYBOARD'] = '1'
 }
 
 $runArgs = @('run', $Games, $Out, '--window', '--max-imports', '1000000000000')

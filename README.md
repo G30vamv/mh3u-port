@@ -83,7 +83,8 @@ Full details and troubleshooting: [`docs/windows.md`](docs/windows.md).
    powershell -ExecutionPolicy Bypass -File scripts\win-run.ps1 -Games 'C:\path\to\your\games'
    ```
 
-   Useful switches: `-Fullscreen`, `-Scale 2`, `-Fps`, `-PadLayout nintendo`, `-NativeMenu`, `-NativeText`.
+   Useful switches: `-Fullscreen`, `-Scale 2`, `-Fps`, `-PadLayout nintendo`, `-NativeMenu`, `-NativeText`,
+   `-NoBackgroundGamepad`, `-BackgroundKeyboard`.
    Instead of `-Games` each time, you can set the folder once: `$env:MH3U_GAMES = 'D:\path\to\your\games'` (or
    `[Environment]::SetEnvironmentVariable('MH3U_GAMES', '...', 'User')`). The scripts stop with a message when neither is set.
 4. After pulling changes to the translator or the hooks, rebuild with `win-build.ps1 -Translate`.
@@ -150,6 +151,8 @@ Full details and troubleshooting: [`docs/windows.md`](docs/windows.md).
 | F1 overlay (on by default; `MH3U_OVERLAY=off`) | The blacksmith wishlist, one per hunter. It shows only once a hunter is loaded. See [`docs/overlay.md`](docs/overlay.md). |
 | `MH3U_NATIVE_TEXT=1` (`-NativeText` / `--native-text`) | The wishlist's status in the game's own item menu. |
 | `MH3U_NATIVE_MENU=1` (`-NativeMenu` / `--native-menu`) | Hold Right Shift or ZL in the start menu and Gestures becomes **Mods**, a native page listing the wishlist ([`docs/native-menu.md`](docs/native-menu.md)). |
+| `MH3U_BACKGROUND_GAMEPAD=0` (`-NoBackgroundGamepad` / `--no-background-gamepad`) | Gamepads play only while the window has the focus. By default they keep playing in the background ([`docs/input.md`](docs/input.md)). |
+| `MH3U_BACKGROUND_KEYBOARD=1` (`-BackgroundKeyboard` / `--background-keyboard`) | The keyboard also plays while the window is in the background (opt-in; never the mouse). |
 | `MH3U_GFX_RESOLUTION_SCALE=1..4` (`-Scale` / `--scale`) | The internal resolution. |
 | `MH3U_AUDIO=off`, `MH3U_AUDIO_FX=off` | No sound, or no reverb and filter. |
 

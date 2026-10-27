@@ -79,3 +79,27 @@ Possible later, with translation-time hooks (`roadmap.md`): mouse-friendly featu
 
 Read with gilrs on a thread of their own. `MH3U_PAD_LAYOUT=nintendo` swaps A with B and X with Y, and `MH3U_GAMEPADS=0` turns them
 off. **Back (View) + RB** opens the overlay (see `overlay.md`).
+
+## While the window is in the background (issue #33)
+
+Two separate settings, so a pad can keep playing while someone else uses the PC:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `MH3U_BACKGROUND_GAMEPAD` (`win-run.ps1 -NoBackgroundGamepad`, `run.sh --no-background-gamepad` set it to `0`) | **on** | Gamepads keep playing when the window does not have the focus. `0` (or `off`) keeps them to the focused window. |
+| `MH3U_BACKGROUND_KEYBOARD` (`-BackgroundKeyboard`, `--background-keyboard` set it to `1`) | off | The keyboard's bindings also play without the focus. Opt-in, so typing elsewhere does not move the hunter. |
+
+- **The mouse** never plays in the background: it is only the right stick while the cursor is grabbed, which needs the focus.
+- **Windows:** gilrs's backend (Windows.Gaming.Input) hears nothing while no window of the process has the focus, so without the
+  focus the pad is read with **XInput** instead (`input.rs`, `background`). That covers Xbox and other XInput pads (and pads that
+  Steam Input or DS4Windows show as one); a PlayStation or Switch pad on its own plays only with the focus. The first connected of
+  XInput's four slots is used. The log says `[gamepad] window in the background: reading the pad with XInput` and `… back to
+  gilrs` on each change; a button held across a focus change is let go and has to be pressed again. Back + RB still opens the
+  overlay from the background.
+- **Linux:** gilrs (evdev) hears pads whatever has the focus, so this only changes anything with `MH3U_BACKGROUND_GAMEPAD=0`.
+  Background keys come from winit's raw device events: X11 gives them, Wayland gives none to a window without the focus.
+- **Keys:** without the focus the raw keys are used (only the game's bindings and the native menu's mod key; F1, F11, F9 and the
+  like do nothing). Keys held when the window gets the focus back are let go, and the window's own key events take over.
+- The startup log says which way each is set: `gamepads also work while the window is in the background …` and `[input] the
+  keyboard … while the window …`.
+- Not yet: a switch in the overlay or the native menu.

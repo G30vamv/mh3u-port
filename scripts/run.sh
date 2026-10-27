@@ -22,6 +22,8 @@ usage: scripts/run.sh [options]
   --native-menu      hold the mod key (Right Shift) in the start menu: Gestures reads "Mods" (MH3U_NATIVE_MENU; opt-in)
   --native-menu-key K  the mod key, as winit names it (MH3U_NATIVE_MENU_KEY; default ShiftRight)
   --native-text      the wishlist's status in the item menu's last empty slot (MH3U_NATIVE_TEXT; opt-in)
+  --no-background-gamepad  gamepads only play while the window has the focus (MH3U_BACKGROUND_GAMEPAD=0; on by default)
+  --background-keyboard    the keyboard also plays while the window is in the background (MH3U_BACKGROUND_KEYBOARD=1; opt-in; X11, not Wayland)
   --scale N          internal resolution 1, 2, 3 or 4 (MH3U_GFX_RESOLUTION_SCALE); omit for the game's own size
   --log FILE         the log (default ./mh3u_latest.log; an older one is renamed after the time it was written)
 USAGE
@@ -30,7 +32,7 @@ USAGE
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 games="${MH3U_GAMES:-}"
 out="${MH3U_OUT:-$HOME/.local/share/mh3u/c}"
-fullscreen=0 fps=0 report=0 dump="" frames="2400" debug_ps="" pad_layout="" scale="" native_text=0 menu_probe=0 native_menu=0 native_menu_key="" log=""
+fullscreen=0 fps=0 report=0 dump="" frames="2400" debug_ps="" pad_layout="" scale="" native_text=0 menu_probe=0 native_menu=0 native_menu_key="" background_gamepad=1 background_keyboard=0 log=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --games) games="$2"; shift 2 ;;
@@ -48,6 +50,8 @@ while [ $# -gt 0 ]; do
             case "$2" in 1|2|3|4) scale="$2" ;; *) echo "--scale is 1, 2, 3 or 4" >&2; exit 2 ;; esac
             shift 2 ;;
         --native-text) native_text=1; shift ;;
+        --no-background-gamepad) background_gamepad=0; shift ;;
+        --background-keyboard) background_keyboard=1; shift ;;
         --menu-probe) menu_probe=1; shift ;;
         --native-menu) native_menu=1; shift ;;
         --native-menu-key) native_menu_key="$2"; shift 2 ;;
@@ -73,7 +77,7 @@ done
 for name in MH3U_FPS MH3U_GFX_TIMES MH3U_GFX_REPORT MH3U_GFX_LOG MH3U_GFX_DUMP_FRAME MH3U_GFX_DUMP_DIR \
     MH3U_GFX_DEBUG_PS MH3U_GFX_DEBUG_PS_ONLY MH3U_GFX_SOLID MH3U_GFX_DEPTH_BIAS MH3U_GFX_TEXDUMP \
     MH3U_GFX_SAVE MH3U_GFX_SAVE_EVERY MH3U_GFX_SAVE_IMAGE MH3U_PAD_LAYOUT MH3U_GFX_RESOLUTION_SCALE MH3U_NATIVE_TEXT MH3U_MENU_PROBE \
-    MH3U_NATIVE_MENU MH3U_NATIVE_MENU_KEY; do
+    MH3U_NATIVE_MENU MH3U_NATIVE_MENU_KEY MH3U_BACKGROUND_GAMEPAD MH3U_BACKGROUND_KEYBOARD; do
     if [ -n "${!name+x}" ]; then
         echo "cleared $name (was '${!name}')"
         unset "$name"
@@ -89,6 +93,8 @@ if [ "$native_text" = 1 ]; then export MH3U_NATIVE_TEXT=1; fi
 if [ "$menu_probe" = 1 ]; then export MH3U_MENU_PROBE=1; fi
 if [ "$native_menu" = 1 ]; then export MH3U_NATIVE_MENU=1; fi
 if [ -n "$native_menu_key" ]; then export MH3U_NATIVE_MENU_KEY="$native_menu_key"; fi
+if [ "$background_gamepad" = 0 ]; then export MH3U_BACKGROUND_GAMEPAD=0; fi
+if [ "$background_keyboard" = 1 ]; then export MH3U_BACKGROUND_KEYBOARD=1; fi
 env | grep '^MH3U_' | sort || true
 
 if [ -z "$log" ]; then

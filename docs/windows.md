@@ -96,7 +96,9 @@ unless `--save-dir` says otherwise. `run` stops after `--max-imports` system cal
 number to play. The variables of `translator.md` work the same in PowerShell: `$env:MH3U_GFX_LOG = '1'`, and
 `Remove-Item Env:MH3U_GFX_LOG` to turn one off again. An Xbox pad's A, B, X and Y are the game's A, B, X and Y; if they come out
 swapped, `$env:MH3U_PAD_LAYOUT = 'nintendo'` swaps A with B and X with Y (the log's `[gamepad] … is the GamePad's …` lines say what each
-face button was taken as).
+face button was taken as). The pad keeps playing while the window is in the background (read with XInput then, so Xbox-style pads
+only); `$env:MH3U_BACKGROUND_GAMEPAD = '0'` (`win-run.ps1 -NoBackgroundGamepad`) turns that off, and
+`$env:MH3U_BACKGROUND_KEYBOARD = '1'` (`-BackgroundKeyboard`) lets the keyboard play in the background too (`input.md`).
 
 The window and the taskbar show the game's icon from your dump (`meta/iconTex.tga`, read at start and kept only in memory).
 `[icon] the game's icon from …` in the log says it was found. Without it, Windows shows the default icon.

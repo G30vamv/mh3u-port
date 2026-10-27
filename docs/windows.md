@@ -60,8 +60,10 @@ take paths as they are, brackets and all.
   crate's exact `fma`, `mh3u_ppc::fused`.)
 - **A sound device** (any; WASAPI's default output is used). Nothing to install for it. `$env:MH3U_AUDIO = 'off'` runs without
   sound, and `$env:MH3U_AUDIO_FX = 'off'` without the reverbs and the low-pass filter (see `audio.md`).
-- **Keyboard and mouse** (see `input.md`): WASD moves, the mouse turns the camera, and the left and right buttons are X and A. The
-  bindings are in `$Out\input\bindings.json`, and `$env:MH3U_KBM = 'off'` turns them off.
+- **Keyboard and mouse** (see `input.md`): **off by default since PR #34** (they were on before); `win-run.ps1 -KeyboardControls`
+  (`$env:MH3U_KEYBOARD_CONTROLS = '1'`) turns them on. Then WASD moves, the mouse turns the camera (the cursor is grabbed), and the
+  left and right buttons are X and A; the bindings are in `$Out\input\bindings.json`. Without them the cursor is never grabbed and
+  keys don't play, but F1, the overlay (mouse and typing), F11 and Alt+Enter work.
 - **The overlay and fullscreen** (see `overlay.md`): F1 or Back + RB opens the blacksmith wishlist (`$env:MH3U_OVERLAY = 'off'` turns it
   off); `win-run.ps1 -Fullscreen` starts in borderless fullscreen, and F11 or Alt+Enter switches while playing.
 - **Your dump** of the game, base game and update (see the first section of `pc-port.md`).
@@ -96,7 +98,10 @@ unless `--save-dir` says otherwise. `run` stops after `--max-imports` system cal
 number to play. The variables of `translator.md` work the same in PowerShell: `$env:MH3U_GFX_LOG = '1'`, and
 `Remove-Item Env:MH3U_GFX_LOG` to turn one off again. An Xbox pad's A, B, X and Y are the game's A, B, X and Y; if they come out
 swapped, `$env:MH3U_PAD_LAYOUT = 'nintendo'` swaps A with B and X with Y (the log's `[gamepad] … is the GamePad's …` lines say what each
-face button was taken as).
+face button was taken as). The pad keeps playing while the window is in the background (read with XInput then, so Xbox-style pads
+only); `$env:MH3U_BACKGROUND_GAMEPAD = '0'` (`win-run.ps1 -NoBackgroundGamepad`) turns that off, and
+`$env:MH3U_BACKGROUND_KEYBOARD = '1'` (`-BackgroundKeyboard`, with `-KeyboardControls`) lets the keyboard play in the background too
+(`input.md`).
 
 The window and the taskbar show the game's icon from your dump (`meta/iconTex.tga`, read at start and kept only in memory).
 `[icon] the game's icon from …` in the log says it was found. Without it, Windows shows the default icon.

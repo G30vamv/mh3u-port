@@ -125,10 +125,13 @@ struct App<F: FnOnce(Display) + Send + 'static> {
     fullscreen: bool,
     alt: bool,
     cursor_shown: bool,
-    /// Keyboard and mouse controls (none with `MH3U_KBM=off`), whether the window has the focus, and whether the cursor is grabbed.
+    /// Keyboard and mouse controls (none unless `MH3U_KEYBOARD_CONTROLS=1`), whether the window has the focus, and whether the cursor is grabbed.
     kbm: Option<kbm::Bindings>,
     focused: bool,
     grabbed: bool,
+    /// Whether the keyboard still plays while the window does not have the focus (`MH3U_BACKGROUND_KEYBOARD=1` with keyboard controls
+    /// on; off by default).
+    background_keys: bool,
 }
 
 /// Whether fullscreen is asked for: `--fullscreen`, or `MH3U_FULLSCREEN=1`.
@@ -186,6 +189,18 @@ fn is_input(event: &WindowEvent) -> bool {
     )
 }
 
+/// Whether the keyboard plays in the background: `MH3U_BACKGROUND_KEYBOARD=1` counts only with keyboard controls on
+/// (`MH3U_KEYBOARD_CONTROLS=1`).
+pub fn background_keys(controls: bool, wanted: bool) -> bool {
+    controls && wanted
+}
+
+/// Whether a raw key press goes to the game: only with background keys on (`MH3U_BACKGROUND_KEYBOARD=1`), while the window does not
+/// have the focus (with it, the window's key events are used) and the overlay is closed.
+pub fn background_key(on: bool, focused: bool, overlay_open: bool) -> bool {
+    on && !focused && !overlay_open
+}
+
 /// The cursor shows in a window, and in fullscreen only while the overlay is open (for its mouse).
 pub fn cursor_visible(fullscreen: bool, overlay_open: bool) -> bool {
     !fullscreen || overlay_open
@@ -207,8 +222,9 @@ impl<F: FnOnce(Display) + Send + 'static> App<F> {
             .map_or((0, (0.0, 0.0)), |b| (b.buttons(&self.keys), b.left_stick(&self.keys)));
         INPUT.set_keyboard_buttons(buttons);
         // the native menu's mod key (MH3U_NATIVE_MENU_KEY; docs/native-menu.md)
+        // (with keyboard controls only: ZL on a gamepad does the same)
         mh3u_rt::native_menu::HELD.store(
-            self.keys.contains(mh3u_rt::native_menu::key()),
+            self.kbm.is_some() && self.keys.contains(mh3u_rt::native_menu::key()),
             std::sync::atomic::Ordering::Relaxed,
         );
         for (i, v) in [x, y, 0.0, 0.0].into_iter().enumerate() {
@@ -302,6 +318,12 @@ impl<F: FnOnce(Display) + Send + 'static> ApplicationHandler for App<F> {
         }
         if let WindowEvent::Focused(f) = event {
             self.focused = f;
+            mh3u_rt::input::FOCUSED.store(f, std::sync::atomic::Ordering::Relaxed);
+            if f && self.background_keys {
+                // keys held in the background are let go: the window's own key events take over from here
+                self.keys.clear();
+                self.keys_changed();
+            }
         }
         // the cursor follows the focus, fullscreen and the overlay (which the gamepad can open too, so this looks at every event)
         self.update_cursor();
@@ -416,8 +438,27 @@ impl<F: FnOnce(Display) + Send + 'static> ApplicationHandler for App<F> {
         }
     }
 
-    /// The mouse's raw motion: the right stick, while the cursor is grabbed.
+    /// The mouse's raw motion: the right stick, while the cursor is grabbed (so never in the background). The keyboard's raw keys:
+    /// the game's keys while the window does not have the focus, with `MH3U_BACKGROUND_KEYBOARD=1` (with the focus, the window's own
+    /// key events are used).
     fn device_event(&mut self, _: &ActiveEventLoop, _: winit::event::DeviceId, event: winit::event::DeviceEvent) {
+        if let winit::event::DeviceEvent::Key(k) = &event
+            && background_key(
+                self.background_keys,
+                self.focused,
+                mh3u_rt::input::OVERLAY_OPEN.load(std::sync::atomic::Ordering::Relaxed),
+            )
+            && let winit::keyboard::PhysicalKey::Code(code) = k.physical_key
+        {
+            let name = format!("{code:?}");
+            if k.state == winit::event::ElementState::Pressed {
+                self.keys.insert(name);
+            } else {
+                self.keys.remove(&name);
+            }
+            self.keys_changed();
+            return;
+        }
         if let winit::event::DeviceEvent::MouseMotion { delta } = event
             && self.grabbed
         {
@@ -432,26 +473,47 @@ impl<F: FnOnce(Display) + Send + 'static> ApplicationHandler for App<F> {
 
 /// Opens the window on this thread (the one that called `main`; borderless fullscreen with `fullscreen`), then calls `start` with the display on a new thread, where the game
 /// runs. Returns when the window is closed.
-/// `bindings` is the keyboard and mouse bindings' file (made with the defaults when missing); none, or `MH3U_KBM=off`, leaves the
-/// keyboard and mouse without controls (the mouse is then the GamePad's touch screen).
+/// `bindings` is the keyboard and mouse bindings' file (made with the defaults when missing). The controls are off unless
+/// `MH3U_KEYBOARD_CONTROLS=1`: then no key plays, the cursor is never grabbed, and the mouse is the GamePad's touch screen (the
+/// window's own keys, F1, F11 and Alt+Enter, still work).
 pub fn run<F: FnOnce(Display) + Send + 'static>(fullscreen: bool, bindings: Option<std::path::PathBuf>, start: F) -> Result<()> {
     let kbm = bindings
-        .filter(|_| kbm::enabled(std::env::var("MH3U_KBM").ok().as_deref()))
+        .filter(|_| kbm::enabled(std::env::var("MH3U_KEYBOARD_CONTROLS").ok().as_deref()))
         .map(|path| {
             let (b, note) = kbm::load_or_create(&path);
             if let Some(note) = note {
                 eprintln!("[input] {note}");
             }
             eprintln!(
-                "[input] keyboard and mouse controls on ({}; MH3U_KBM=off turns them off)",
+                "[input] keyboard and mouse controls on ({}; MH3U_KEYBOARD_CONTROLS=1)",
                 path.display()
             );
             b.mouse_stick(&mut mh3u_rt::input::INPUT.mouse.lock().unwrap_or_else(|e| e.into_inner()));
             *overlay::CONTROLS.lock().unwrap_or_else(|e| e.into_inner()) = b.lines();
             b
         });
+    if kbm.is_none() {
+        eprintln!(
+            "[input] keyboard and mouse controls off: the cursor is not grabbed and keys do not play (MH3U_KEYBOARD_CONTROLS=1, win-run.ps1 -KeyboardControls, turns them on)"
+        );
+    }
+    if std::env::var_os("MH3U_KBM").is_some() {
+        eprintln!("[input] MH3U_KBM is no longer read: keyboard and mouse controls are off unless MH3U_KEYBOARD_CONTROLS=1");
+    }
+    let background_wanted = mh3u_rt::input::switch_setting(std::env::var("MH3U_BACKGROUND_KEYBOARD").ok().as_deref(), false);
+    let background_keys = background_keys(kbm.is_some(), background_wanted);
+    if background_wanted && !background_keys {
+        eprintln!("[input] MH3U_BACKGROUND_KEYBOARD=1 does nothing without keyboard controls (MH3U_KEYBOARD_CONTROLS=1)");
+    }
     let event_loop = EventLoop::new().context("starting the window system")?;
     event_loop.set_control_flow(ControlFlow::Wait);
+    if background_keys {
+        // raw keys from the system whatever has the focus (Windows and X11; Wayland gives none to a window without the focus)
+        event_loop.listen_device_events(winit::event_loop::DeviceEvents::Always);
+        eprintln!("[input] the keyboard also plays while the window is in the background (MH3U_BACKGROUND_KEYBOARD=1; not the mouse)");
+    } else if kbm.is_some() {
+        eprintln!("[input] the keyboard and mouse only play while the window has the focus (MH3U_BACKGROUND_KEYBOARD=1 adds the keyboard)");
+    }
     let mut app = App {
         start: Some(start),
         failed: None,
@@ -467,6 +529,7 @@ pub fn run<F: FnOnce(Display) + Send + 'static>(fullscreen: bool, bindings: Opti
         kbm,
         focused: true,
         grabbed: false,
+        background_keys,
     };
     event_loop.run_app(&mut app).context("running the window")?;
     match app.failed {
@@ -531,6 +594,17 @@ mod window_tests {
                 toggle: false
             }
         );
+    }
+
+    #[test]
+    fn raw_keys_play_only_in_the_background_with_the_opt_in_and_the_overlay_closed() {
+        assert!(!background_key(false, false, false), "off by default");
+        assert!(background_key(true, false, false));
+        assert!(!background_key(true, true, false), "with the focus the window's own events count");
+        assert!(!background_key(true, false, true), "the open overlay takes input");
+        assert!(background_keys(true, true));
+        assert!(!background_keys(false, true), "nothing without keyboard controls");
+        assert!(!background_keys(true, false));
     }
 
     #[test]

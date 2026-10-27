@@ -139,6 +139,32 @@ pub static OVERLAY_PRESSES: std::sync::Mutex<Vec<u32>> = std::sync::Mutex::new(V
 /// Minus opens its menu only on its own, and the combination's buttons are kept from the game until they are let go.
 pub const OVERLAY_COMBO: u32 = button::MINUS | button::R;
 
+/// Whether the game's window has the focus (the window sets it on each focus change).
+pub static FOCUSED: AtomicBool = AtomicBool::new(true);
+/// Whether gamepads still reach the game while the window does not have the focus: on by default, `MH3U_BACKGROUND_GAMEPAD=0`
+/// turns it off (issue #33; `start_gamepads` reads the setting). The keyboard's counterpart, `MH3U_BACKGROUND_KEYBOARD`, is off by
+/// default and lives in the window (`mh3u-gfx`).
+pub static BACKGROUND_PADS: AtomicBool = AtomicBool::new(true);
+
+/// An on/off setting: `1`, `on`, `true` or `yes` is on, `0`, `off`, `false` or `no` is off, and anything else (or nothing) is
+/// `default`.
+pub fn switch_setting(value: Option<&str>, default: bool) -> bool {
+    match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+        Some("1" | "on" | "true" | "yes") => true,
+        Some("0" | "off" | "false" | "no") => false,
+        _ => default,
+    }
+}
+
+/// Whether the gamepads' buttons and sticks reach the game: with the focus, or without it when background gamepads are on.
+pub fn pads_reach_game(focused: bool, background: bool) -> bool {
+    focused || background
+}
+
+fn pads_heard() -> bool {
+    pads_reach_game(FOCUSED.load(Relaxed), BACKGROUND_PADS.load(Relaxed))
+}
+
 fn store(a: &AtomicU32, v: f32) {
     a.store(v.to_bits(), Relaxed);
 }
@@ -224,6 +250,19 @@ impl Input {
         store(&self.pad_sticks[axis], v);
     }
 
+    /// Lets go of every gamepad button and centres the sticks (when the gamepads' source changes, so nothing stays held).
+    pub fn release_pads(&self) {
+        let held = self.pad.load(Relaxed);
+        for bit in 0..32 {
+            if held & (1 << bit) != 0 {
+                self.set_pad_button(1 << bit, false);
+            }
+        }
+        for axis in 0..4 {
+            self.set_pad_axis(axis, 0.0);
+        }
+    }
+
     /// A touch of the GamePad's screen at (x, y) in `TOUCH_SIZE` units, or none.
     pub fn set_touch(&self, at: Option<(f32, f32)>) {
         if let Some((x, y)) = at {
@@ -245,8 +284,9 @@ impl Input {
             .unwrap_or_else(|e| e.into_inner())
             .sample(std::time::Instant::now());
         let mouse = [0.0, 0.0, mx, my];
+        let heard = pads_heard();
         for (i, o) in out.iter_mut().enumerate() {
-            let p = load(&self.pad_sticks[i]);
+            let p = if heard { load(&self.pad_sticks[i]) } else { 0.0 };
             *o = if p.abs() > 0.05 {
                 p
             } else {
@@ -262,14 +302,15 @@ impl Input {
             return 0;
         }
         let s = self.sticks();
-        let all = self.keyboard.load(Relaxed) | self.pad.load(Relaxed) | stick_buttons(s[0], s[1], true) | stick_buttons(s[2], s[3], false);
+        let pad = if pads_heard() { self.pad.load(Relaxed) } else { 0 };
+        let all = self.keyboard.load(Relaxed) | pad | stick_buttons(s[0], s[1], true) | stick_buttons(s[2], s[3], false);
         // ZL is the native Mods entry's modifier while the start menu is up (`native_menu::swallowed`; 0 with the opt-in off)
         all & !SWALLOWED.load(Relaxed) & !crate::native_menu::swallowed()
     }
 
     /// The gamepads' buttons only (not the keyboard's).
     pub fn pad_buttons(&self) -> u32 {
-        if OVERLAY_OPEN.load(Relaxed) {
+        if OVERLAY_OPEN.load(Relaxed) || !pads_heard() {
             return 0;
         }
         self.pad.load(Relaxed)
@@ -353,6 +394,16 @@ pub fn start_gamepads() {
         eprintln!("gamepads off (MH3U_GAMEPADS=0)");
         return;
     }
+    let background = switch_setting(std::env::var("MH3U_BACKGROUND_GAMEPAD").ok().as_deref(), true);
+    BACKGROUND_PADS.store(background, Relaxed);
+    eprintln!(
+        "{}",
+        if background {
+            "gamepads also work while the window is in the background (MH3U_BACKGROUND_GAMEPAD=0 turns that off)"
+        } else {
+            "gamepads only work while the window has the focus (MH3U_BACKGROUND_GAMEPAD=0)"
+        }
+    );
     let _ = std::thread::Builder::new().name("gamepads".into()).spawn(|| {
         let mut gilrs = match gilrs::Gilrs::new() {
             Ok(g) => g,
@@ -379,7 +430,17 @@ pub fn start_gamepads() {
         // The pending events are taken without waiting, and the thread sleeps a little when there are none. It does not wait in
         // gilrs's blocking call (`next_event_blocking` with a timeout), which was where a Windows profile found this thread taking
         // a whole core; a plain sleep costs nothing on any platform whatever the backend does.
+        // Windows: gilrs's backend (Windows.Gaming.Input) hears nothing while the window does not have the focus, so then the
+        // pads are read with XInput instead (`background::Pad`; Xbox-style pads only), and gilrs's events are dropped
+        #[cfg(windows)]
+        let mut xinput = background::Pad::new(layout);
         loop {
+            #[cfg(windows)]
+            if xinput.step(!FOCUSED.load(Relaxed) && BACKGROUND_PADS.load(Relaxed)) {
+                while gilrs.next_event().is_some() {}
+                std::thread::sleep(PAD_IDLE);
+                continue;
+            }
             let Some(event) = gilrs.next_event() else {
                 std::thread::sleep(PAD_IDLE);
                 continue;
@@ -418,9 +479,165 @@ pub fn start_gamepads() {
     });
 }
 
+/// The pads while the window is in the background on Windows, read with XInput: gilrs's Windows backend (Windows.Gaming.Input) only
+/// hears pads while a window of the process has the focus, while XInput hears them always (but only Xbox-style pads, the first
+/// one connected of the four slots).
+#[cfg(windows)]
+mod background {
+    use super::{INPUT, PadLayout, button, pad_button};
+    use gilrs::Button;
+    use std::time::{Duration, Instant};
+    use windows_sys::Win32::UI::Input::XboxController::{XINPUT_STATE, XInputGetState};
+
+    /// XInput's button bits (`XINPUT_GAMEPAD_*`) as gilrs names them, so they map to the GamePad's as gilrs's events do.
+    const BUTTONS: [(u16, Button); 14] = [
+        (0x0001, Button::DPadUp),
+        (0x0002, Button::DPadDown),
+        (0x0004, Button::DPadLeft),
+        (0x0008, Button::DPadRight),
+        (0x0010, Button::Start),
+        (0x0020, Button::Select),
+        (0x0040, Button::LeftThumb),
+        (0x0080, Button::RightThumb),
+        (0x0100, Button::LeftTrigger),
+        (0x0200, Button::RightTrigger),
+        (0x1000, Button::South),
+        (0x2000, Button::East),
+        (0x4000, Button::West),
+        (0x8000, Button::North),
+    ];
+    /// XInput's own dead zones and trigger threshold (`XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE` and the rest).
+    const LEFT_DEADZONE: f32 = 7849.0;
+    const RIGHT_DEADZONE: f32 = 8689.0;
+    const TRIGGER_THRESHOLD: u8 = 30;
+    /// An empty slot is slow to ask about, so without a pad the slots are looked through at most this often.
+    const RESCAN: Duration = Duration::from_secs(1);
+
+    fn axis(v: i16, deadzone: f32) -> f32 {
+        let v = f32::from(v);
+        if v.abs() < deadzone { 0.0 } else { (v / 32767.0).clamp(-1.0, 1.0) }
+    }
+
+    pub struct Pad {
+        layout: PadLayout,
+        active: bool,
+        slot: Option<u32>,
+        scanned: Option<Instant>,
+        held: u32,
+    }
+
+    impl Pad {
+        pub fn new(layout: PadLayout) -> Pad {
+            Pad {
+                layout,
+                active: false,
+                slot: None,
+                scanned: None,
+                held: 0,
+            }
+        }
+
+        fn state(slot: u32) -> Option<XINPUT_STATE> {
+            // SAFETY: XInputGetState writes one XINPUT_STATE, a plain struct for which all zeros is a valid value, to the pointer it
+            // is given, which points at one here
+            unsafe {
+                let mut state: XINPUT_STATE = std::mem::zeroed();
+                (XInputGetState(slot, &mut state) == 0).then_some(state)
+            }
+        }
+
+        /// Reads the pad when `wanted` (the window in the background with background gamepads on), and says whether it did. Each
+        /// change between the two sources lets go of what the other held.
+        pub fn step(&mut self, wanted: bool) -> bool {
+            if wanted != self.active {
+                self.active = wanted;
+                self.held = 0;
+                INPUT.release_pads();
+                eprintln!(
+                    "[gamepad] {}",
+                    if wanted {
+                        "window in the background: reading the pad with XInput"
+                    } else {
+                        "window focused: back to gilrs"
+                    }
+                );
+            }
+            if !self.active {
+                return false;
+            }
+            let state = match self.slot.and_then(Self::state) {
+                Some(s) => Some(s),
+                None => {
+                    self.slot = None;
+                    let now = Instant::now();
+                    if self.scanned.is_none_or(|t| now.duration_since(t) >= RESCAN) {
+                        self.scanned = Some(now);
+                        self.slot = (0..4).find(|&i| Self::state(i).is_some());
+                    }
+                    self.slot.and_then(Self::state)
+                }
+            };
+            let Some(state) = state else {
+                if self.held != 0 {
+                    self.held = 0;
+                    INPUT.release_pads();
+                }
+                return true;
+            };
+            let g = state.Gamepad;
+            let pressed = g.wButtons;
+            let mut mask = 0;
+            for (bit, b) in BUTTONS {
+                if pressed & bit != 0
+                    && let Some(m) = pad_button(b, self.layout)
+                {
+                    mask |= m;
+                }
+            }
+            if g.bLeftTrigger > TRIGGER_THRESHOLD {
+                mask |= button::ZL;
+            }
+            if g.bRightTrigger > TRIGGER_THRESHOLD {
+                mask |= button::ZR;
+            }
+            let changed = mask ^ self.held;
+            for bit in 0..32 {
+                let m = 1 << bit;
+                if changed & m != 0 {
+                    INPUT.set_pad_button(m, mask & m != 0);
+                }
+            }
+            self.held = mask;
+            let sticks = [
+                axis(g.sThumbLX, LEFT_DEADZONE),
+                axis(g.sThumbLY, LEFT_DEADZONE),
+                axis(g.sThumbRX, RIGHT_DEADZONE),
+                axis(g.sThumbRY, RIGHT_DEADZONE),
+            ];
+            for (i, v) in sticks.into_iter().enumerate() {
+                INPUT.set_pad_axis(i, v);
+            }
+            true
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn background_gamepads_are_on_by_default_and_keep_the_pads_without_the_focus() {
+        assert!(switch_setting(None, true));
+        assert!(!switch_setting(Some("0"), true));
+        assert!(!switch_setting(Some(" off "), true));
+        assert!(switch_setting(Some("1"), false));
+        assert!(switch_setting(Some("ON"), false));
+        assert!(!switch_setting(Some("maybe"), false), "anything else is the default");
+        assert!(pads_reach_game(true, false), "with the focus, always");
+        assert!(pads_reach_game(false, true));
+        assert!(!pads_reach_game(false, false), "MH3U_BACKGROUND_GAMEPAD=0 without the focus");
+    }
 
     #[test]
     fn the_mouse_stick_follows_the_mouse_s_speed_and_falls_back_to_zero_when_it_stops() {

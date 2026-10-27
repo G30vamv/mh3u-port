@@ -806,7 +806,7 @@ impl Overlay {
             .default_open(false)
             .show(ctx, |ui| {
                 if controls.is_empty() {
-                    ui.label("Keyboard and mouse controls are off (MH3U_KBM=off): the mouse is the GamePad's touch screen.");
+                    ui.label("Keyboard and mouse controls are off (the default; MH3U_KEYBOARD_CONTROLS=1 or win-run.ps1 -KeyboardControls turns them on): the mouse is the GamePad's touch screen.");
                     return;
                 }
                 ui.label("Keyboard and mouse (edit input/bindings.json in the build folder, then restart):");
